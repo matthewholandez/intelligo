@@ -3,6 +3,7 @@ from pathlib import Path
 from intelligo.exceptions import ConfigNotLoadedError, ScraperError
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
+from google import genai
 
 try:
     with open(Path(__file__).resolve().parent / "config.yaml", "r", encoding="utf-8") as file:
@@ -16,12 +17,12 @@ class RawChapter(BaseModel):
     """
     novel_title: str
     content: str
+    number: int
 
 class TranslatedChapter(RawChapter):
     """
     Represents a chapter of a novel after translation.
     """
-    number: int
     chapter_title: str
 
 class Intelligo:
@@ -49,10 +50,18 @@ class Intelligo:
         self.prompt_file = Path(__file__).resolve().parent / self.constants.get("prompt", "prompt.md")
 
         self.soup = self._load_html()
+        self.prompt = self._load_prompt()
         
         return None
+    
+    def translate_chapter(self) -> TranslatedChapter:
+        """
+        Scrapes, translates, and formats a chapter of a novel.
+        """
+        raw_chapter = self._scrape_chapter()
 
-    def scrape_chapter(self) -> RawChapter:
+
+    def _scrape_chapter(self) -> RawChapter:
         """
         Extracts the novel title and content from the web page.
         """
@@ -91,3 +100,12 @@ class Intelligo:
         with open(self.input_file, "r", encoding="utf-8") as file:
             html_content = file.read()
         return BeautifulSoup(html_content, "html.parser")
+    
+    def _load_prompt(self) -> str:
+        """
+        Loads the prompt from the prompt file.
+        """
+        if not self.prompt_file.is_file():
+            raise FileNotFoundError(f"Prompt file {self.prompt_file} not found.")
+        with open(self.prompt_file, "r", encoding="utf-8") as file:
+            return file.read()
