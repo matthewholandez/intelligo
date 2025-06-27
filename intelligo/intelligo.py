@@ -73,24 +73,25 @@ class Intelligo:
         else:
             raise ScraperError("Chapter content not found.")
         
-        novel_title = self.soup.select_one('.bottom-wrapper > div:nth-child(2) > div:nth-child(1)').contents[0].strip()
-        if not novel_title:
+        raw_title = self.soup.select_one('.bottom-wrapper > div:nth-child(2) > div:nth-child(1)').contents[0].strip()
+        if not raw_title:
             raise ScraperError("Novel title not found.")
         
-        # HERE
-        # Extract chapter number from title (number preceding "화")
-        chapter_match = re.search(r'(\d+)화', novel_title)
+        chapter_match = re.search(r'(\d+)화', raw_title)
         if chapter_match:
             chapter_number = int(chapter_match.group(1))
         else:
-            chapter_number = 1  # Default fallback
-
+            chapter_number = 1
+        
+        # Remove chapter number and "화" character from title
+        novel_title = re.sub(r'-?\d+화$', '', raw_title).strip() 
 
         scraped_chapter = RawChapter(
             novel_title = novel_title,
             content = formatted_novel_content,
-            number = chapter_number  # Use extracted chapter number
+            number = chapter_number
         )
+
         return scraped_chapter
 
     def _load_html(self) -> BeautifulSoup:
