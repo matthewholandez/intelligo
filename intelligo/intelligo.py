@@ -4,6 +4,7 @@ from intelligo.exceptions import ConfigNotLoadedError, ScraperError
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
 from google import genai
+import re
 
 try:
     with open(Path(__file__).resolve().parent / "config.yaml", "r", encoding="utf-8") as file:
@@ -60,38 +61,37 @@ class Intelligo:
         """
         raw_chapter = self._scrape_chapter()
 
-
     def _scrape_chapter(self) -> RawChapter:
         """
         Extracts the novel title and content from the web page.
-        """
-        scraped_chapter: RawChapter = {
-            "novel_title": self._scrape_novel_title(),
-            "content": self._scrape_chapter_content()
-        }
-        return scraped_chapter
-
-    def _scrape_chapter_content(self) -> str | None:
-        """
-        Extracts only the chapter content from the web page. 
         """
         novel_content = self.soup.select_one(self.css_selectors["chapter_content"])
         if novel_content and len(novel_content.contents) >= 4:
             content_container = novel_content.contents[3]
             paragraphs = content_container.find_all("p") or content_container.find_all("div")
-            return "\n\n".join(p.get_text(strip=True) for p in paragraphs if p.get_text())
+            formatted_novel_content = "\n\n".join(p.get_text(strip=True) for p in paragraphs if p.get_text())
         else:
             raise ScraperError("Chapter content not found.")
-
-    def _scrape_novel_title(self) -> str | None:
-        """
-        Extracts only the novel title from the web page.
-        """
-        title = self.soup.select_one('.bottom-wrapper > div:nth-child(2) > div:nth-child(1)').contents[0].strip()
-        if title:
-            return title
-        else:
+        
+        novel_title = self.soup.select_one('.bottom-wrapper > div:nth-child(2) > div:nth-child(1)').contents[0].strip()
+        if not novel_title:
             raise ScraperError("Novel title not found.")
+        
+        # HERE
+        # Extract chapter number from title (number preceding "화")
+        chapter_match = re.search(r'(\d+)화', novel_title)
+        if chapter_match:
+            chapter_number = int(chapter_match.group(1))
+        else:
+            chapter_number = 1  # Default fallback
+
+
+        scraped_chapter = RawChapter(
+            novel_title = novel_title,
+            content = formatted_novel_content,
+            number = chapter_number  # Use extracted chapter number
+        )
+        return scraped_chapter
 
     def _load_html(self) -> BeautifulSoup:
         """
