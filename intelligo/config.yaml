@@ -1,0 +1,5 @@
+constants:
+  css_selectors:
+    chapter_title: ".bottom-wrapper > div:nth-child(2) > div:nth-child(1)"
+    chapter_content: "#novel_content"
+  prompt: prompt.md

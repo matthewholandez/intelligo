@@ -1,0 +1,93 @@
+import yaml
+from pathlib import Path
+from intelligo.exceptions import ConfigNotLoadedError, ScraperError
+from pydantic import BaseModel
+from bs4 import BeautifulSoup
+
+try:
+    with open(Path(__file__).resolve().parent / "config.yaml", "r", encoding="utf-8") as file:
+        CONFIG = yaml.safe_load(file)
+except FileNotFoundError:
+    CONFIG = {}
+
+class RawChapter(BaseModel):
+    """
+    Represents a chapter of a novel in its raw form.
+    """
+    novel_title: str
+    content: str
+
+class TranslatedChapter(RawChapter):
+    """
+    Represents a chapter of a novel after translation.
+    """
+    number: int
+    chapter_title: str
+
+class Intelligo:
+    """
+    Translates Asian web novels into English and formats 
+    them into a readable format.
+
+    Arguments:
+    - input_file: Path to the input file containing the novel text.
+    - output_dir: Path to the output directory where the formatted text will be saved."
+    """
+    def __init__(self, input_file: Path, output_dir: Path) -> None:
+        assert (isinstance(input_file, Path) and isinstance(output_dir, Path)), "Input and output files must be Path objects."
+        assert input_file.glob("*.html"), "Input file must be an HTML file."
+        self.input_file = input_file
+        assert output_dir.is_dir(), "Output file must be a directory."
+        self.output_dir = output_dir
+
+        if not CONFIG or not CONFIG["constants"]["css_selectors"] or not CONFIG["constants"]["prompt"]:
+            raise ConfigNotLoadedError(
+                "Configuration file not loaded or missing required keys."
+            )
+        self.constants = CONFIG["constants"]
+        self.css_selectors = self.constants["css_selectors"]
+        self.prompt_file = Path(__file__).resolve().parent / self.constants.get("prompt", "prompt.md")
+
+        self.soup = self._load_html()
+        
+        return None
+
+    def scrape_chapter(self) -> RawChapter:
+        """
+        Extracts the novel title and content from the web page.
+        """
+        scraped_chapter: RawChapter = {
+            "novel_title": self._scrape_novel_title(),
+            "content": self._scrape_chapter_content()
+        }
+        return scraped_chapter
+
+    def _scrape_chapter_content(self) -> str | None:
+        """
+        Extracts only the chapter content from the web page. 
+        """
+        novel_content = self.soup.select_one(self.css_selectors["chapter_content"])
+        if novel_content and len(novel_content.contents) >= 4:
+            content_container = novel_content.contents[3]
+            paragraphs = content_container.find_all("p") or content_container.find_all("div")
+            return "\n\n".join(p.get_text(strip=True) for p in paragraphs if p.get_text())
+        else:
+            raise ScraperError("Chapter content not found.")
+
+    def _scrape_novel_title(self) -> str | None:
+        """
+        Extracts only the novel title from the web page.
+        """
+        title = self.soup.select_one('.bottom-wrapper > div:nth-child(2) > div:nth-child(1)').contents[0].strip()
+        if title:
+            return title
+        else:
+            raise ScraperError("Novel title not found.")
+
+    def _load_html(self) -> BeautifulSoup:
+        """
+        Loads the HTML content from the input file.
+        """
+        with open(self.input_file, "r", encoding="utf-8") as file:
+            html_content = file.read()
+        return BeautifulSoup(html_content, "html.parser")
