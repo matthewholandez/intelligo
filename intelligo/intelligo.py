@@ -41,14 +41,10 @@ class Intelligo:
 
     Arguments:
     - input_file: Path to the input file containing the novel text.
-    - output_dir: Path to the output directory where the formatted text will be saved."
     """
-    def __init__(self, input_file: Path, output_dir: Path) -> None:
-        assert (isinstance(input_file, Path) and isinstance(output_dir, Path)), "Input and output files must be Path objects."
-        assert input_file.glob("*.html"), "Input file must be an HTML file."
+    def __init__(self, input_file: Path) -> None:
+        assert (isinstance(input_file, Path) and input_file.glob("*.html")), "Input file must be Path object and HTML file."
         self.input_file = input_file
-        assert output_dir.is_dir(), "Output file must be a directory."
-        self.output_dir = output_dir
 
         if not CONFIG or not CONFIG["css_selectors"] or not CONFIG["prompt"]:
             raise ConfigNotLoadedError(
@@ -69,7 +65,7 @@ class Intelligo:
         Scrapes, translates, and formats a chapter of a novel.
         """
         raw_chapter = self._scrape_chapter()
-        
+
         raw_chapter_lines = len(raw_chapter.content.split("\n"))
         attempts = 0
         while attempts < 3:
@@ -88,7 +84,7 @@ class Intelligo:
         if attempts == 3:
             raise ScraperError("Failed to translate chapter after 3 attempts.")
 
-        formatted_content = self._format_translated_chapter_content(translated_content.parsed.content)
+        formatted_content = self._format_translated_chapter_content(translated_content.parsed.content, raw_chapter.number, translated_content.parsed.chapter_title)
 
         return TranslatedChapter(
             novel_title=raw_chapter.novel_title,
@@ -97,13 +93,14 @@ class Intelligo:
             chapter_title=translated_content.parsed.chapter_title
         )
     
-    def _format_translated_chapter_content(self, content: str) -> str:
+    def _format_translated_chapter_content(self, content: str, number: int, title: str | None) -> str:
         """
         Formats the translated chapter content.
         """
         lines = [line.strip() for line in content.split('\n') if line.strip()]
         formatted_content = "\n\n".join(lines)
-        return formatted_content
+        _formatted_content = f"# Chapter {number}. {title}\n\n" if title else f"# Chapter {number}\n\n" + formatted_content
+        return _formatted_content
 
     def _scrape_chapter(self) -> RawChapter:
         """
