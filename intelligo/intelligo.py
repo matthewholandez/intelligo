@@ -69,6 +69,7 @@ class Intelligo:
         Scrapes, translates, and formats a chapter of a novel.
         """
         raw_chapter = self._scrape_chapter()
+        
         raw_chapter_lines = len(raw_chapter.content.split("\n"))
         attempts = 0
         while attempts < 3:
@@ -76,7 +77,7 @@ class Intelligo:
                 model="gemini-2.5-flash",
                 contents=[self.prompt, f"For your information, the novel title is {raw_chapter.novel_title}.", f"The content you will translate is:\n\n{raw_chapter.content}"],
                 config = {
-                    "temperature": 0.1,
+                    "temperature": 0.3,
                     "response_mime_type": "application/json",
                     "response_schema": GeminiChapterOutput,
                     "thinking_config": { "thinking_budget": 1000 }
