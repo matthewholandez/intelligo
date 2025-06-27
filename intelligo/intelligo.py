@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from bs4 import BeautifulSoup
 from google import genai
 import re
+import os
 
 try:
     with open(Path(__file__).resolve().parent / "config.yaml", "r", encoding="utf-8") as file:
@@ -24,7 +25,14 @@ class TranslatedChapter(RawChapter):
     """
     Represents a chapter of a novel after translation.
     """
-    chapter_title: str
+    chapter_title: str | None = None
+
+class GeminiChapterOutput(BaseModel):
+    """
+    Represents the output format for the translated chapter.
+    """
+    chapter_title: str | None = None
+    content: str
 
 class Intelligo:
     """
@@ -42,16 +50,17 @@ class Intelligo:
         assert output_dir.is_dir(), "Output file must be a directory."
         self.output_dir = output_dir
 
-        if not CONFIG or not CONFIG["constants"]["css_selectors"] or not CONFIG["constants"]["prompt"]:
+        if not CONFIG or not CONFIG["css_selectors"] or not CONFIG["prompt"]:
             raise ConfigNotLoadedError(
                 "Configuration file not loaded or missing required keys."
             )
-        self.constants = CONFIG["constants"]
-        self.css_selectors = self.constants["css_selectors"]
-        self.prompt_file = Path(__file__).resolve().parent / self.constants.get("prompt", "prompt.md")
+        self.css_selectors = CONFIG["css_selectors"]
+        self.prompt_file = Path(__file__).resolve().parent / CONFIG["prompt"]
 
         self.soup = self._load_html()
         self.prompt = self._load_prompt()
+        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+        self.gemini_client = genai.Client(api_key=GEMINI_API_KEY)
         
         return None
     
@@ -60,6 +69,40 @@ class Intelligo:
         Scrapes, translates, and formats a chapter of a novel.
         """
         raw_chapter = self._scrape_chapter()
+        raw_chapter_lines = len(raw_chapter.content.split("\n"))
+        attempts = 0
+        while attempts < 3:
+            translated_content = self.gemini_client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[self.prompt, f"For your information, the novel title is {raw_chapter.novel_title}.", f"The content you will translate is:\n\n{raw_chapter.content}"],
+                config = {
+                    "temperature": 0.1,
+                    "response_mime_type": "application/json",
+                    "response_schema": GeminiChapterOutput,
+                    "thinking_config": { "thinking_budget": 1000 }
+                }
+            )
+            if len(translated_content.parsed.content.split("\n")) >= int(raw_chapter_lines * 0.8): break
+            attempts += 1
+        if attempts == 3:
+            raise ScraperError("Failed to translate chapter after 3 attempts.")
+
+        formatted_content = self._format_translated_chapter_content(translated_content.parsed.content)
+
+        return TranslatedChapter(
+            novel_title=raw_chapter.novel_title,
+            content=formatted_content,
+            number=raw_chapter.number,
+            chapter_title=translated_content.parsed.chapter_title
+        )
+    
+    def _format_translated_chapter_content(self, content: str) -> str:
+        """
+        Formats the translated chapter content.
+        """
+        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        formatted_content = "\n\n".join(lines)
+        return formatted_content
 
     def _scrape_chapter(self) -> RawChapter:
         """
@@ -83,7 +126,6 @@ class Intelligo:
         else:
             chapter_number = 1
         
-        # Remove chapter number and "화" character from title
         novel_title = re.sub(r'-?\d+화$', '', raw_title).strip() 
 
         scraped_chapter = RawChapter(
