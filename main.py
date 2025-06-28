@@ -28,35 +28,48 @@ def setup_logging(verbose: bool = False) -> None:
 
 def get_input_files(input_dir: Path, pattern: str = "*.html") -> List[Path]:
     """
-    Get all HTML files from the input directory.
+    Get all HTML files from the input directory, sorted in ascending numerical order.
     
     Args:
         input_dir: Directory containing input files
         pattern: File pattern to match (default: "*.html")
         
     Returns:
-        List of Path objects for matching files
+        List of Path objects for matching files, sorted by chapter number
         
     Raises:
         FileNotFoundError: If input directory doesn't exist
     """
+    import re
+    
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory '{input_dir}' not found")
     
     files = list(input_dir.glob(pattern))
     if not files:
         logging.warning(f"No files matching '{pattern}' found in '{input_dir}'")
+        return files
+    
+    def extract_chapter_number(file_path: Path) -> int:
+        """Extract chapter number from filename for sorting."""
+        # Look for numbers in the filename (e.g., "1화", "10화", "chapter-5", etc.)
+        match = re.search(r'(\d+)', file_path.stem)
+        return int(match.group(1)) if match else 0
+    
+    # Sort files by extracted chapter number
+    files.sort(key=extract_chapter_number)
     
     return files
 
 
-def process_single_file(input_file: Path, output_dir: Path, force: bool = False) -> bool:
+def process_single_file(input_file: Path, output_dir: Path, context_chapters: Optional[int] = None, force: bool = False) -> bool:
     """
     Process a single HTML file through the translation pipeline.
     
     Args:
         input_file: Path to the input HTML file
         output_dir: Directory for output files
+        context_chapters: Number of previous chapters to use as context
         force: Whether to overwrite existing translations
         
     Returns:
@@ -65,8 +78,8 @@ def process_single_file(input_file: Path, output_dir: Path, force: bool = False)
     logger = logging.getLogger(__name__)
     
     try:
-        # Initialize Intelligo with the input file
-        intelligo = Intelligo(input_file)
+        # Initialize Intelligo with the input file and output directory for context
+        intelligo = Intelligo(input_file, context_chapters=context_chapters, output_dir=output_dir)
         
         # Scrape chapter information
         scraped_chapter = intelligo.scrape_chapter()
@@ -81,7 +94,8 @@ def process_single_file(input_file: Path, output_dir: Path, force: bool = False)
             logger.info(f"⏭️  Skipping '{input_file.name}' - translation already exists")
             return True
         
-        logger.info(f"🔄 Processing '{input_file.name}' -> Chapter {chapter_number}")
+        context_info = f" (with {intelligo.context_chapters} chapters context)" if intelligo.context_chapters > 0 else " (no context)"
+        logger.info(f"🔄 Processing '{input_file.name}' -> Chapter {chapter_number}{context_info}")
         
         # Translate the chapter
         translated_chapter = intelligo.translate_chapter()
@@ -115,6 +129,8 @@ Examples:
   %(prog)s -i custom_input/         # Use custom input directory
   %(prog)s -o translations/         # Use custom output directory
   %(prog)s --force                  # Overwrite existing translations
+  %(prog)s --context-chapters 5     # Use 5 previous chapters as context
+  %(prog)s --no-context             # Disable context (each chapter independent)
   %(prog)s --verbose                # Enable debug logging
         """
     )
@@ -137,6 +153,19 @@ Examples:
         "--force",
         action="store_true",
         help="Overwrite existing translation files"
+    )
+    
+    parser.add_argument(
+        "--context-chapters",
+        type=int,
+        metavar="N",
+        help="Number of previous chapters to include as context for consistency (default: from config.yaml)"
+    )
+    
+    parser.add_argument(
+        "--no-context",
+        action="store_true",
+        help="Disable context from previous chapters (translate each chapter independently)"
     )
     
     parser.add_argument(
@@ -163,6 +192,16 @@ Examples:
         logger.info(f"📁 Input: {args.input_dir}")
         logger.info(f"📁 Output: {args.output_dir}")
         
+        # Determine context chapters setting
+        context_chapters = None
+        if args.no_context:
+            context_chapters = 0
+        elif args.context_chapters is not None:
+            context_chapters = args.context_chapters
+        
+        if context_chapters is not None:
+            logger.info(f"🔗 Context: {context_chapters} previous chapters")
+        
         # Process each file
         successful = 0
         failed = 0
@@ -170,7 +209,7 @@ Examples:
         for i, input_file in enumerate(input_files, 1):
             logger.info(f"📚 Processing file {i}/{len(input_files)}: {input_file.name}")
             
-            if process_single_file(input_file, args.output_dir, args.force):
+            if process_single_file(input_file, args.output_dir, context_chapters, args.force):
                 successful += 1
             else:
                 failed += 1

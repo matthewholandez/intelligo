@@ -2,3 +2,10 @@ css_selectors:
   chapter_title: ".bottom-wrapper > div:nth-child(2) > div:nth-child(1)"
   chapter_content: "#novel_content"
 prompt: prompt.md
+
+# Context settings for translation consistency
+context:
+  # Number of previous chapters to include as context (0 to disable)
+  previous_chapters: 3
+  # Maximum tokens to use for context (leave room for main content)
+  max_context_tokens: 200000

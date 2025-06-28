@@ -41,8 +41,18 @@ class Intelligo:
 
     Arguments:
     - input_file: Path to the input file containing the novel text.
+    - context_chapters: Number of previous chapters to include as context (default: 3)
+    - output_dir: Directory containing previously translated chapters for context
     """
-    def __init__(self, input_file: Path) -> None:
+    def __init__(self, input_file: Path, context_chapters: int = 3, output_dir: Path = None) -> None:
+        if not isinstance(input_file, Path):
+            raise ValueError("Input file must be a Path object")
+        if not input_file.suffix.lower() == '.html':
+            raise ValueError("Input file must be an HTML file")
+        if not input_file.exists():
+            raise FileNotFoundError(f"Input file '{input_file}' not found")
+        
+    def __init__(self, input_file: Path, context_chapters: int = None, output_dir: Path = None) -> None:
         if not isinstance(input_file, Path):
             raise ValueError("Input file must be a Path object")
         if not input_file.suffix.lower() == '.html':
@@ -51,11 +61,21 @@ class Intelligo:
             raise FileNotFoundError(f"Input file '{input_file}' not found")
         
         self.input_file = input_file
-
+        
         if not CONFIG or not CONFIG["css_selectors"] or not CONFIG["prompt"]:
             raise ConfigNotLoadedError(
                 "Configuration file not loaded or missing required keys."
             )
+        
+        # Set context chapters from parameter, config, or default
+        if context_chapters is not None:
+            self.context_chapters = max(0, context_chapters)
+        elif CONFIG.get("context", {}).get("previous_chapters") is not None:
+            self.context_chapters = max(0, CONFIG["context"]["previous_chapters"])
+        else:
+            self.context_chapters = 3  # Default value
+            
+        self.output_dir = output_dir or Path("output")
         self.css_selectors = CONFIG["css_selectors"]
         self.prompt_file = Path(__file__).resolve().parent / CONFIG["prompt"]
 
@@ -103,13 +123,29 @@ class Intelligo:
         Scrapes, translates, and formats a chapter of a novel.
         """
         raw_chapter = self.scrape_chapter()
+        
+        # Get context from previous chapters
+        context = self._get_previous_chapters_context(raw_chapter.novel_title, raw_chapter.number)
 
         raw_chapter_lines = len(raw_chapter.content.split("\n"))
         attempts = 0
         while attempts < 3:
+            # Build the content list for Gemini
+            content_list = [self.prompt]
+            
+            # Add context if available
+            if context:
+                content_list.append(context)
+            
+            # Add the novel information and content to translate
+            content_list.extend([
+                f"For your information, the novel title is {raw_chapter.novel_title}.",
+                f"The content you will translate is:\n\n{raw_chapter.content}"
+            ])
+            
             translated_content = self.gemini_client.models.generate_content(
                 model="gemini-2.5-flash",
-                contents=[self.prompt, f"For your information, the novel title is {raw_chapter.novel_title}.", f"The content you will translate is:\n\n{raw_chapter.content}"],
+                contents=content_list,
                 config = {
                     "temperature": 0.3,
                     "response_mime_type": "application/json",
@@ -156,3 +192,55 @@ class Intelligo:
             raise FileNotFoundError(f"Prompt file {self.prompt_file} not found.")
         with open(self.prompt_file, "r", encoding="utf-8") as file:
             return file.read()
+    
+    def _get_previous_chapters_context(self, novel_title: str, current_chapter: int) -> str:
+        """
+        Loads previously translated chapters to provide context for translation consistency.
+        
+        Args:
+            novel_title: The title of the novel
+            current_chapter: The current chapter number being translated
+            
+        Returns:
+            A formatted string containing the previous chapters for context
+        """
+        if self.context_chapters == 0:
+            return ""
+        
+        # Create safe directory name by removing/replacing problematic characters
+        # First remove common problematic characters, then replace with underscores
+        safe_novel_title = re.sub(r'[<>:"/\\|?*]', '_', novel_title)
+        safe_novel_title = re.sub(r'[^\w\s-]', '_', safe_novel_title)  # Keep only word chars, spaces, hyphens
+        safe_novel_title = safe_novel_title.strip()
+        
+        novel_dir = self.output_dir / safe_novel_title
+        
+        if not novel_dir.exists():
+            return ""
+        
+        previous_chapters = []
+        context_text = ""
+        
+        # Get the range of chapters to include as context
+        start_chapter = max(1, current_chapter - self.context_chapters)
+        
+        for chapter_num in range(start_chapter, current_chapter):
+            chapter_file = novel_dir / f"ch-{chapter_num}.md"
+            if chapter_file.exists():
+                try:
+                    with open(chapter_file, "r", encoding="utf-8") as file:
+                        chapter_content = file.read()
+                        previous_chapters.append(f"=== CHAPTER {chapter_num} ===\n{chapter_content}\n")
+                except Exception:
+                    continue  # Skip if file can't be read
+        
+        if previous_chapters:
+            context_text = f"""
+PREVIOUS CHAPTERS FOR CONTEXT (maintain consistency with these translations):
+{''.join(previous_chapters)}
+=== END OF CONTEXT ===
+
+Please maintain consistency with character names, gender references, honorifics, and terminology used in the above context.
+"""
+        
+        return context_text
