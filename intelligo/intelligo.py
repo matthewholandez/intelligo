@@ -43,7 +43,13 @@ class Intelligo:
     - input_file: Path to the input file containing the novel text.
     """
     def __init__(self, input_file: Path) -> None:
-        assert (isinstance(input_file, Path) and input_file.glob("*.html")), "Input file must be Path object and HTML file."
+        if not isinstance(input_file, Path):
+            raise ValueError("Input file must be a Path object")
+        if not input_file.suffix.lower() == '.html':
+            raise ValueError("Input file must be an HTML file")
+        if not input_file.exists():
+            raise FileNotFoundError(f"Input file '{input_file}' not found")
+        
         self.input_file = input_file
 
         if not CONFIG or not CONFIG["css_selectors"] or not CONFIG["prompt"]:
@@ -131,7 +137,7 @@ class Intelligo:
         """
         lines = [line.strip() for line in content.split('\n') if line.strip()]
         formatted_content = "\n\n".join(lines)
-        _formatted_content = f"# Chapter {number}. {title}\n\n" if title else f"# Chapter {number}\n\n" + formatted_content
+        _formatted_content = f"# Chapter {number}. {title}\n\n" + formatted_content if title else f"# Chapter {number}\n\n" + formatted_content
         return _formatted_content
 
     def _load_html(self) -> BeautifulSoup:

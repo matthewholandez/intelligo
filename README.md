@@ -1,2 +1,0 @@
-# Intelligo
-Scrape > Translate > Processing
