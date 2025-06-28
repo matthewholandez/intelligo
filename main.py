@@ -85,8 +85,6 @@ def process_single_file(input_file: Path, output_dir: Path, force: bool = False)
         
         # Translate the chapter
         translated_chapter = intelligo.translate_chapter()
-
-        print(translated_chapter)  # Debugging output
         
         # Ensure output directory exists
         output_file.parent.mkdir(parents=True, exist_ok=True)
