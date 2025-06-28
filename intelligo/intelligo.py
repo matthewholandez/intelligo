@@ -60,11 +60,43 @@ class Intelligo:
         
         return None
     
+    def scrape_chapter(self) -> RawChapter:
+        """
+        Extracts the novel title and content from the web page.
+        """
+        novel_content = self.soup.select_one(self.css_selectors["chapter_content"])
+        if novel_content and len(novel_content.contents) >= 4:
+            content_container = novel_content.contents[3]
+            paragraphs = content_container.find_all("p") or content_container.find_all("div")
+            formatted_novel_content = "\n\n".join(p.get_text(strip=True) for p in paragraphs if p.get_text())
+        else:
+            raise ScraperError("Chapter content not found.")
+        
+        raw_title = self.soup.select_one('.bottom-wrapper > div:nth-child(2) > div:nth-child(1)').contents[0].strip()
+        if not raw_title:
+            raise ScraperError("Novel title not found.")
+        
+        chapter_match = re.search(r'(\d+)화', raw_title)
+        if chapter_match:
+            chapter_number = int(chapter_match.group(1))
+        else:
+            chapter_number = 1
+        
+        novel_title = re.sub(r'-?\d+화$', '', raw_title).strip() 
+
+        scraped_chapter = RawChapter(
+            novel_title = novel_title,
+            content = formatted_novel_content,
+            number = chapter_number
+        )
+
+        return scraped_chapter
+    
     def translate_chapter(self) -> TranslatedChapter:
         """
         Scrapes, translates, and formats a chapter of a novel.
         """
-        raw_chapter = self._scrape_chapter()
+        raw_chapter = self.scrape_chapter()
 
         raw_chapter_lines = len(raw_chapter.content.split("\n"))
         attempts = 0
@@ -101,38 +133,6 @@ class Intelligo:
         formatted_content = "\n\n".join(lines)
         _formatted_content = f"# Chapter {number}. {title}\n\n" if title else f"# Chapter {number}\n\n" + formatted_content
         return _formatted_content
-
-    def _scrape_chapter(self) -> RawChapter:
-        """
-        Extracts the novel title and content from the web page.
-        """
-        novel_content = self.soup.select_one(self.css_selectors["chapter_content"])
-        if novel_content and len(novel_content.contents) >= 4:
-            content_container = novel_content.contents[3]
-            paragraphs = content_container.find_all("p") or content_container.find_all("div")
-            formatted_novel_content = "\n\n".join(p.get_text(strip=True) for p in paragraphs if p.get_text())
-        else:
-            raise ScraperError("Chapter content not found.")
-        
-        raw_title = self.soup.select_one('.bottom-wrapper > div:nth-child(2) > div:nth-child(1)').contents[0].strip()
-        if not raw_title:
-            raise ScraperError("Novel title not found.")
-        
-        chapter_match = re.search(r'(\d+)화', raw_title)
-        if chapter_match:
-            chapter_number = int(chapter_match.group(1))
-        else:
-            chapter_number = 1
-        
-        novel_title = re.sub(r'-?\d+화$', '', raw_title).strip() 
-
-        scraped_chapter = RawChapter(
-            novel_title = novel_title,
-            content = formatted_novel_content,
-            number = chapter_number
-        )
-
-        return scraped_chapter
 
     def _load_html(self) -> BeautifulSoup:
         """
