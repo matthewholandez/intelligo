@@ -174,7 +174,6 @@ class Intelligo:
                     "thinking_config": { "thinking_budget": 1000 }
                 }
             )
-            print(translated_content.parsed.content)
             print(f"Attempt {attempts}: Translation completed")
             translated_lines = len(translated_content.parsed.content.split("\n"))
             print(f"Original lines: {raw_chapter_lines}, Translated lines: {translated_lines}")
