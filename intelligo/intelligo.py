@@ -2,7 +2,6 @@ import yaml
 from pathlib import Path
 from intelligo.exceptions import ConfigNotLoadedError, ScraperError
 from intelligo.models import RawChapter, TranslatedChapter, GeminiChapterOutput
-from pydantic import BaseModel
 from bs4 import BeautifulSoup
 from google import genai
 import re
@@ -40,7 +39,7 @@ class Intelligo:
                 "Configuration file not loaded or missing required keys."
             )
         
-        # Set context chapters from parameter, config, or default
+        # Set context chapters from parameter, config, or default in order of decreasing priority
         if context_chapters is not None:
             self.context_chapters = max(0, context_chapters)
         elif CONFIG.get("context", {}).get("previous_chapters") is not None:
