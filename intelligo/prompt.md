@@ -205,7 +205,8 @@ Use consistent romanization following these patterns:
 
 **Chapter Title Guidelines:**
 - Extract from the first 1-3 lines of source text
-- Exclude chapter numbers (e.g., "2화", "Chapter 2")  
+- Exclude chapter numbers (e.g., "2화", "Chapter 2")
+- *Important: The novel title differs from the chapter title, and will be provided to you below so you don't mistake the two.*  
 - Set to `null` if no distinct title exists
 - Translate title naturally while preserving meaning
 

@@ -1,38 +1,19 @@
 import yaml
 from pathlib import Path
 from intelligo.exceptions import ConfigNotLoadedError, ScraperError
+from intelligo.models import RawChapter, TranslatedChapter, GeminiChapterOutput
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
 from google import genai
 import re
 import os
 
+# Load from config.yaml
 try:
     with open(Path(__file__).resolve().parent / "config.yaml", "r", encoding="utf-8") as file:
         CONFIG = yaml.safe_load(file)
 except FileNotFoundError:
     CONFIG = {}
-
-class RawChapter(BaseModel):
-    """
-    Represents a chapter of a novel in its raw form.
-    """
-    novel_title: str
-    content: str
-    number: int
-
-class TranslatedChapter(RawChapter):
-    """
-    Represents a chapter of a novel after translation.
-    """
-    chapter_title: str | None = None
-
-class GeminiChapterOutput(BaseModel):
-    """
-    Represents the output format for the translated chapter.
-    """
-    chapter_title: str | None = None
-    content: str
 
 class Intelligo:
     """
@@ -164,16 +145,22 @@ class Intelligo:
                 f"The content you will translate is:\n\n{raw_chapter.content}"
             ])
             
-            translated_content = self.gemini_client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=content_list,
-                config = {
-                    "temperature": 0.3,
-                    "response_mime_type": "application/json",
-                    "response_schema": GeminiChapterOutput,
-                    "thinking_config": { "thinking_budget": 1000 }
-                }
-            )
+            try:
+                translated_content = self.gemini_client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=content_list,
+                    config = {
+                        "temperature": 0.3,
+                        "response_mime_type": "application/json",
+                        "response_schema": GeminiChapterOutput,
+                        "thinking_config": { "thinking_budget": 1000 }
+                    }
+                )
+            except Exception as e:
+                print(f"Error during translation attempt {attempts}: {e}")
+                if attempts == 7:
+                    raise ScraperError("Failed to translate chapter after 7 attempts.")
+                continue
             print(f"Attempt {attempts}: Translation completed")
             translated_lines = len(translated_content.parsed.content.split("\n"))
             print(f"Original lines: {raw_chapter_lines}, Translated lines: {translated_lines}")
@@ -199,7 +186,7 @@ class Intelligo:
     
     def _format_translated_chapter_content(self, content: str, number: int, title: str | None) -> str:
         """
-        Formats the translated chapter content.
+        Formats the translated chapter content by ensuring lines are always double spaced.
         """
         lines = [line.strip() for line in content.split('\n') if line.strip()]
         formatted_content = "\n\n".join(lines)
