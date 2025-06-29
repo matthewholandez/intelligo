@@ -24,15 +24,7 @@ class Intelligo:
     - input_file: Path to the input file containing the novel text.
     - context_chapters: Number of previous chapters to include as context (default: 3)
     - output_dir: Directory containing previously translated chapters for context
-    """
-    def __init__(self, input_file: Path, context_chapters: int = 3, output_dir: Path = None) -> None:
-        if not isinstance(input_file, Path):
-            raise ValueError("Input file must be a Path object")
-        if not input_file.suffix.lower() == '.html':
-            raise ValueError("Input file must be an HTML file")
-        if not input_file.exists():
-            raise FileNotFoundError(f"Input file '{input_file}' not found")
-        
+    """ 
     def __init__(self, input_file: Path, context_chapters: int = None, output_dir: Path = None) -> None:
         if not isinstance(input_file, Path):
             raise ValueError("Input file must be a Path object")
