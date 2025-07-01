@@ -2,9 +2,8 @@ import yaml
 from pathlib import Path
 from intelligo.exceptions import ConfigNotLoadedError, ScraperError
 from intelligo.types import RawChapter, TranslatedChapter, GeminiChapterOutput
-from bs4 import BeautifulSoup
+from intelligo.scrape import WebNovelScraper
 from google import genai
-import re
 import os
 
 class Intelligo:
@@ -17,7 +16,6 @@ class Intelligo:
     - context_chapters: Number of previous chapters to include as context (default: 3)
     - output_dir: Directory containing previously translated chapters for context
     """ 
-    # def __init__(self, input_file: Path, context_chapters: int = None, output_dir: Path = None) -> None:
     def __init__(self, input_file: Path, additional_instructions: str | None = None) -> None:
         # Verify all arguments are valid.
         if not isinstance(input_file, Path):
@@ -47,63 +45,20 @@ class Intelligo:
         self.additional_instructions = additional_instructions
         self.preferences = CONFIG["preferences"]
 
-        # Load soup and Gemini.
-        self.soup = self._load_html()
+        # Initialize scraper and Gemini client.
+        self.scraper = WebNovelScraper(input_file, self.css_selectors)
         self.gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         
         return None
     
+
     def scrape_chapter(self) -> RawChapter:
         """
-        Extracts the novel title and content from the web page.
+        Extracts the novel title and content from the web page using the scraper.
         """
-        novel_content = self.soup.select_one(self.css_selectors["chapter_content"])
-        if novel_content and len(novel_content.contents) >= 4:
-            content_container = novel_content.contents[3]
-            
-            # First try to find paragraph tags
-            paragraphs = content_container.find_all("p")
-            if paragraphs:
-                formatted_novel_content = "\n\n".join(p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True))
-            else:
-                # If no paragraphs found, try div tags
-                divs = content_container.find_all("div")
-                if divs:
-                    # Filter out divs that only contain <br> tags or are empty
-                    text_divs = []
-                    for div in divs:
-                        text_content = div.get_text(strip=True)
-                        if text_content and text_content != "":
-                            text_divs.append(text_content)
-                    formatted_novel_content = "\n\n".join(text_divs)
-                else:
-                    raise ScraperError("No paragraph or div content found.")
-            
-            if not formatted_novel_content:
-                raise ScraperError("No readable content found.")
-        else:
-            raise ScraperError("Chapter content not found.")
+        return self.scraper.scrape_chapter()
 
-        raw_title = self.soup.select_one('.bottom-wrapper > div:nth-child(2) > div:nth-child(1)').contents[0].strip()
-        if not raw_title:
-            raise ScraperError("Novel title not found.")
-        
-        chapter_match = re.search(r'(\d+)화', raw_title)
-        if chapter_match:
-            chapter_number = int(chapter_match.group(1))
-        else:
-            chapter_number = 1
-        
-        novel_title = re.sub(r'-?\d+화$', '', raw_title).strip() 
 
-        scraped_chapter = RawChapter(
-            novel_title = novel_title,
-            content = formatted_novel_content,
-            number = chapter_number
-        )
-
-        return scraped_chapter
-    
     def translate_chapter(self) -> TranslatedChapter:
         """
         Scrapes, translates, and formats a chapter of a novel.
@@ -165,6 +120,7 @@ class Intelligo:
             chapter_title=translated_content.parsed.chapter_title
         )
     
+
     def _format_translated_chapter_content(self, content: str, number: int, title: str | None) -> str:
         """
         Formats the translated chapter content by ensuring lines are always double spaced.
@@ -174,14 +130,6 @@ class Intelligo:
         _formatted_content = f"# Chapter {number}. {title}\n\n" + formatted_content if title else f"# Chapter {number}\n\n" + formatted_content
         return _formatted_content
 
-    def _load_html(self) -> BeautifulSoup:
-        """
-        Loads the HTML content from the input file.
-        """
-        with open(self.input_file, "r", encoding="utf-8") as file:
-            html_content = file.read()
-        return BeautifulSoup(html_content, "html.parser")
-    
     def _load_prompt(self) -> str:
         """
         Loads the prompt from the prompt file.
