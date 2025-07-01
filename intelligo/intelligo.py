@@ -2,7 +2,7 @@ import yaml
 from pathlib import Path
 from intelligo.exceptions import ConfigNotLoadedError, ScraperError
 from intelligo.types import RawChapter, TranslatedChapter, GeminiChapterOutput
-from intelligo.scrape import WebNovelScraper
+from intelligo.scraper import WebNovelScraper
 from google import genai
 import os
 
@@ -129,6 +129,7 @@ class Intelligo:
         formatted_content = "\n\n".join(lines)
         _formatted_content = f"# Chapter {number}. {title}\n\n" + formatted_content if title else f"# Chapter {number}\n\n" + formatted_content
         return _formatted_content
+
 
     def _load_prompt(self) -> str:
         """
