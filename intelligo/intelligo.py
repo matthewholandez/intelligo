@@ -1,18 +1,11 @@
 import yaml
 from pathlib import Path
 from intelligo.exceptions import ConfigNotLoadedError, ScraperError
-from intelligo.models import RawChapter, TranslatedChapter, GeminiChapterOutput
+from intelligo.types import RawChapter, TranslatedChapter, GeminiChapterOutput
 from bs4 import BeautifulSoup
 from google import genai
 import re
 import os
-
-# Load from config.yaml
-try:
-    with open(Path(__file__).resolve().parent / "config.yaml", "r", encoding="utf-8") as file:
-        CONFIG = yaml.safe_load(file)
-except FileNotFoundError:
-    CONFIG = {}
 
 class Intelligo:
     """
@@ -25,18 +18,25 @@ class Intelligo:
     - output_dir: Directory containing previously translated chapters for context
     """ 
     def __init__(self, input_file: Path, context_chapters: int = None, output_dir: Path = None) -> None:
+        # Verify all arguments are valid.
         if not isinstance(input_file, Path):
             raise ValueError("Input file must be a Path object")
         if not input_file.suffix.lower() == '.html':
             raise ValueError("Input file must be an HTML file")
         if not input_file.exists():
             raise FileNotFoundError(f"Input file '{input_file}' not found")
-        
         self.input_file = input_file
+
+        # Load config from config.yaml
+        try:
+            with open(Path(__file__).resolve().parent / "config.yaml", "r", encoding="utf-8") as file:
+                CONFIG = yaml.safe_load(file)
+        except FileNotFoundError:
+            raise ConfigNotLoadedError("Configuration file 'config.yaml' not found.")
         
         if not CONFIG or not CONFIG["css_selectors"] or not CONFIG["prompt"]:
             raise ConfigNotLoadedError(
-                "Configuration file not loaded or missing required keys."
+                "Configuration file missing required keys."
             )
         
         # Set context chapters from parameter, config, or default in order of decreasing priority
