@@ -3,3 +3,6 @@ __pycache__/
 output/
 *.html
 .DS_Store
+.env
+translated_chapters/
+input_html/

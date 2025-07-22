@@ -4,6 +4,7 @@ from intelligo.exceptions import ConfigNotLoadedError, ScraperError
 from intelligo.types import RawChapter, TranslatedChapter, GeminiChapterOutput
 from intelligo.scraper import WebNovelScraper
 from google import genai
+from google.genai import types
 import os
 
 class Intelligo:
@@ -72,25 +73,25 @@ class Intelligo:
             
             # Build the content list for Gemini
             content_list = [self.prompt,
-                            f"For your information, the novel title in Korean is {raw_chapter.novel_title}. Do not use this as the chapter title you output."]
-            
+                            f"<novel_title>{raw_chapter.novel_title}. Do not use this as the chapter title you output.</novel_title>"]
+
             # Add context from previous chapters if available.
             if self.additional_instructions:
-                content_list.append(f"The following additional instructions should also be followed:\n\n{self.additional_instructions}")
+                content_list.append(f"<additional_instructions>\n{self.additional_instructions}\n</additional_instructions>")
 
             # Finally, append the raw chapter content.
-            content_list.append(f"Here is the chapter you will translate into English:\n\n{raw_chapter.content}")
+            content_list.append(f"<source_text>\n{raw_chapter.content}\n</source_text>")
             
             try:
                 translated_content = self.gemini_client.models.generate_content(
                     model="gemini-2.5-flash",
                     contents=content_list,
-                    config={
-                        "temperature": 0.3,
-                        "response_mime_type": "application/json",
-                        "response_schema": GeminiChapterOutput,
-                        "thinking_config": { "thinking_budget": 1000 }
-                    }
+                    config=types.GenerateContentConfig(
+                        temperature=0.3,
+                        response_mime_type="application/json",
+                        response_schema=GeminiChapterOutput,
+                        # thinking_config=types.ThinkingConfig(thinking_budget=1000)
+                    )
                 )
             except Exception as e:
                 print(f"Error during translation attempt {attempts}: {e}")
