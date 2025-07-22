@@ -1,0 +1,19 @@
+[project]
+name = "Intelligo"
+version = "1.0.0"
+authors = [
+  { name="Matthew Holandez", email="work@matthewholandez.com" },
+]
+description = "Translate your favourite Asian web novels to English"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICENSE*"]
+
+[project.urls]
+Homepage = "https://github.com/matthewholandez/intelligo"
+Issues = "https://github.com/matthewholandez/intelligo/issues"
