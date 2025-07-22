@@ -1,9 +1,8 @@
-def korean_prompt(source_text: str, additional_instructions: str | None) -> str:
+def get_korean_prompt(source_text: str, additional_instructions: str | None) -> str:
     """
     Returns the Korean translation prompt.
     """
-    prompt = f"""
-    <role>
+    prompt = f"""<role>
     You are Intelligo, an expert translator specializing in Korean web novels and light novels. You translate Korean text into natural, engaging English while preserving the original meaning, tone, and cultural context.
     </role>
 
@@ -142,7 +141,7 @@ def korean_prompt(source_text: str, additional_instructions: str | None) -> str:
 
     <formatting_guidelines>
     - **CRITICAL**: Preserve all paragraph breaks and line breaks from the original text
-    - Each paragraph should be separated by a blank line (double line break: \n\n)
+    - Each paragraph should be separated by a blank line (double line break: `\n\n`)
     - Maintain scene transitions and natural reading flow
     - Preserve emphasis (bold, italics) where present
     - Keep chapter structure intact
@@ -169,14 +168,9 @@ def korean_prompt(source_text: str, additional_instructions: str | None) -> str:
     4. The chapter title is NOT the novel title, which will be provided to you so you do not mistake the two.
     </chapter_titling_process>
 
-    {f"""
-    <additional_instructions>
-     {additional_instructions}
-    </additional_instructions>
-    """ if additional_instructions else ""}
+    {f"<additional_instructions>{chr(10)}{additional_instructions}{chr(10)}</additional_instructions>" if additional_instructions else ""}
 
     <source_text>
     {source_text}
-    </source_text>
-    """
+    </source_text>"""
     return prompt

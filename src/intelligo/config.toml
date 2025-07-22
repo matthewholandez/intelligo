@@ -1,0 +1,4 @@
+[gemini]
+model = "gemini-2.5-flash" # Pick from https://ai.google.dev/gemini-api/docs/models (flash-lite not recommended)
+temperature = 0.3 # Explanation: https://cloud.google.com/vertex-ai/generative-ai/docs/learn/prompts/adjust-parameter-values
+thinking_budget = 1024 # https://ai.google.dev/gemini-api/docs/thinking
