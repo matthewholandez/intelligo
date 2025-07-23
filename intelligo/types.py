@@ -3,11 +3,21 @@ from pydantic import BaseModel
 
 class ScrapedChapter(BaseModel):
     """
-    Represents a chapter of a novel after scraping.
+    Represents a raw novel chapter.
     """
     novel_title: str
     chapter_number: int
     raw_text: str
+
+
+class TranslatedChapter(BaseModel):
+    """
+    Represents a translated novel chapter.
+    """
+    novel_title: str
+    chapter_title: str | None
+    chapter_number: int
+    translated_text: str
 
 
 class GeminiChapterResponse(BaseModel):
@@ -17,17 +27,11 @@ class GeminiChapterResponse(BaseModel):
     chapter_title: str | None
     translated_text: str
 
-class TranslatedChapter(BaseModel):
-    """
-    Represents a translated chapter of a novel.
-    """
-    novel_title: str
-    chapter_title: str | None
-    chapter_number: int
-    translated_text: str
-
 
 class GeminiConfig(BaseModel):
+    """
+    Gemini configuration.
+    """
     model: str
     temperature: float
     thinking_budget: int
