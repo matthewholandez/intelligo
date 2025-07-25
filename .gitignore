@@ -6,3 +6,4 @@ output/
 .env
 translated_chapters/
 input_html/
+.idea/

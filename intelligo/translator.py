@@ -14,10 +14,10 @@ class Translator:
     def __init__(self) -> None:
         self.gemini_client = genai.Client(api_key=getenv("GEMINI_API_KEY"))
         with open(Path(__file__).parent / "config.toml", "rb") as f:
-            config: IntelligoConfig = tomllib.load(f)
+            config = tomllib.load(f)
         self.config = config
-        return None
-    
+
+
     def translate(self, 
                   raw_chapter: ScrapedChapter,
                   additional_instructions: str | None = None) -> TranslatedChapter:
