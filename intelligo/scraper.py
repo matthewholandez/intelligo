@@ -18,12 +18,13 @@ def scrape(source_file: Path) -> ScrapedChapter:
     with open(source_file, "r") as f:
         html_content: str = f.read()
 
-    text = extract(html_content)
-
     metadata = extract_metadata(html_content)
     if not metadata.url and metadata.title:
         raise InvalidSourceFileError("The source file could not be read.")
     detailed_metadata = get_detailed_metadata(metadata)
+
+    raw_text = extract(html_content)
+    text = process_raw_text(metadata=metadata, raw_text=raw_text)
 
     return ScrapedChapter(
         raw_text=text,
@@ -52,6 +53,21 @@ def get_detailed_metadata(metadata: Document) -> ScrapedChapterMetadata:
                 novel_title=metadata.title,
                 chapter_number=None,
             )
+
+
+def process_raw_text(metadata: Document, raw_text: str) -> str:
+    """
+    If the site is known, apply post-processing to the raw text.
+    This is useful for sites that have a specific format or structure.
+    """
+    parsed_url = urlparse(metadata.url)
+    hostname = parsed_url.hostname
+
+    match hostname:
+        case "booktoki468.com":
+            return '\n'.join(raw_text.split('\n')[:-1])
+        case _:
+            return raw_text
 
 
 class Scraper:
