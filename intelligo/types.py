@@ -1,12 +1,19 @@
 from pydantic import BaseModel
 
 
+class ScrapedChapterMetadata(BaseModel):
+    """
+    Represents chapter metadata.
+    """
+    novel_title: str
+    chapter_number: int | None
+
+
 class ScrapedChapter(BaseModel):
     """
     Represents a raw novel chapter.
     """
-    novel_title: str
-    chapter_number: int
+    metadata: ScrapedChapterMetadata
     raw_text: str
 
 
@@ -16,7 +23,7 @@ class TranslatedChapter(BaseModel):
     """
     novel_title: str
     chapter_title: str | None
-    chapter_number: int
+    chapter_number: int | None
     translated_text: str
 
 

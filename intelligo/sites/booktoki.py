@@ -1,4 +1,5 @@
 from trafilatura.metadata import Document
+from intelligo.types import ScrapedChapterMetadata
 
 
 class BookTokiScraper:
@@ -12,9 +13,6 @@ class BookTokiScraper:
     
 
     def get_chapter_number(self) -> int | None:
-        """
-        Extract the chapter number from the metadata.
-        """
         title = self.metadata.title
         if '화' in title:
             try:
@@ -25,9 +23,15 @@ class BookTokiScraper:
     
     
     def get_novel_title(self) -> str | None:
-        """
-        Extract the novel title from the metadata.
-        """
-        if self.metadata.title:
-            return self.metadata.title.split('화')[0].strip()
-        return None
+        title = self.metadata.title
+
+        # Find the pattern of number + '화' to identify where the chapter number starts
+        import re
+        match = re.search(r'\s+\d+화', title)
+        if match:
+            # Extract everything before the chapter number
+            novel_title = title[:match.start()].strip()
+            return novel_title
+
+        # If no chapter pattern found, fall back to splitting on '>'
+        return title.split('>')[0].strip()

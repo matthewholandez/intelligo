@@ -1,3 +1,4 @@
-from intelligo.translator import Translator
+from intelligo.scraper import scrape
+from pathlib import Path
 
-translator = Translator()
+print(scrape(Path(__file__).parent / 'test.html'))

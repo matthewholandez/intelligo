@@ -1,5 +1,5 @@
 from pathlib import Path
-from intelligo.types import ScrapedChapter
+from intelligo.types import ScrapedChapter, ScrapedChapterMetadata
 from intelligo.exceptions import InvalidSourceFileError
 from trafilatura import extract, extract_metadata
 from trafilatura.metadata import Document
@@ -23,27 +23,35 @@ def scrape(source_file: Path) -> ScrapedChapter:
     metadata = extract_metadata(html_content)
     if not metadata.url and metadata.title:
         raise InvalidSourceFileError("The source file could not be read.")
+    detailed_metadata = get_detailed_metadata(metadata)
 
     return ScrapedChapter(
         raw_text=text,
-        novel_title="Example Novel",
-        chapter_number=1
+        metadata=detailed_metadata
     )
 
 
-def get_novel_title_from_known_site(url: str, metadata: Document) -> str | None:
+def get_detailed_metadata(metadata: Document) -> ScrapedChapterMetadata:
     """
-    Try to extract the novel title if the site is known.
+    Try to extract the novel title and chapter number.
+    Works best if the site is known.
     """
 
-    parsed_url = urlparse(url)
+    parsed_url = urlparse(metadata.url)
     hostname = parsed_url.hostname
 
     match hostname:
         case "booktoki468.com":
-            return BookTokiScraper(metadata=metadata).get_novel_title()
+            booktoki = BookTokiScraper(metadata)
+            return ScrapedChapterMetadata(
+                novel_title=booktoki.get_novel_title(),
+                chapter_number=booktoki.get_chapter_number(),
+            )
         case _:
-            return None
+            return ScrapedChapterMetadata(
+                novel_title=metadata.title,
+                chapter_number=None,
+            )
 
 
 class Scraper:
