@@ -1,15 +1,3 @@
-"""
-intelligo.exceptions
-===================
-This module defines custom exceptions for the Intelligo library.
-"""
-
-class ConfigNotLoadedError(Exception):
-    """
-    Exception raised when the configuration file is not loaded.
-    """
-
-class ScraperError(Exception):
-    """
-    Exception raised when there is an error in the web scraping process.
-    """
+class InvalidSourceFileError(Exception):
+    """Exception raised when the source file is invalid or cannot be read."""
+    pass

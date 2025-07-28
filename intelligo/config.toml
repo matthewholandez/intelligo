@@ -1,0 +1,8 @@
+[gemini]
+model = "gemini-2.5-flash" # Pick from https://ai.google.dev/gemini-api/docs/models (flash-lite not recommended)
+temperature = 0.3 # Explanation: https://cloud.google.com/vertex-ai/generative-ai/docs/learn/prompts/adjust-parameter-values
+thinking_budget = 1024 # https://ai.google.dev/gemini-api/docs/thinking
+
+[constants]
+max_attempts = 7 # Maximum number of attempts Intelligo will make to Gemini to get a proper response (see below)
+acceptable_line_count_ratio = 0.75 # A proper response from Gemini will have this percentage of the total lines in the source text

@@ -1,22 +1,60 @@
 from pydantic import BaseModel
 
-class RawChapter(BaseModel):
+
+class ScrapedChapterMetadata(BaseModel):
     """
-    Represents a chapter of a novel in its raw form.
+    Represents chapter metadata.
     """
     novel_title: str
-    content: str
-    number: int
+    chapter_number: int | None
 
-class TranslatedChapter(RawChapter):
-    """
-    Represents a chapter of a novel after translation.
-    """
-    chapter_title: str | None = None
 
-class GeminiChapterOutput(BaseModel):
+class ScrapedChapter(BaseModel):
     """
-    Represents the output format for the translated chapter.
+    Represents a raw novel chapter.
     """
-    chapter_title: str | None = None
-    content: str
+    metadata: ScrapedChapterMetadata
+    raw_text: str
+
+
+class TranslatedChapter(BaseModel):
+    """
+    Represents a translated novel chapter.
+    """
+    novel_title: str
+    chapter_title: str | None
+    chapter_number: int | None
+    translated_text: str
+
+
+class GeminiChapterResponse(BaseModel):
+    """
+    Represents the output format Gemini should return.
+    """
+    chapter_title: str | None
+    translated_text: str
+
+
+class IntelligoConfigGemini(BaseModel):
+    """
+    Gemini configuration.
+    """
+    model: str
+    temperature: float
+    thinking_budget: int
+
+
+class IntelligoConfigConstants(BaseModel):
+    """
+    Constants configuration.
+    """
+    max_attempts: int
+    acceptable_line_count_ratio: float
+
+
+class IntelligoConfig(BaseModel):
+    """
+    Configuration model.
+    """
+    gemini: IntelligoConfigGemini
+    constants: IntelligoConfigConstants

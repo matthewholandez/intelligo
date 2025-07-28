@@ -1,257 +1,89 @@
-#!/usr/bin/env python3
-"""
-Example usage of the Intelligo package for translating HTML files.
-
-This script demonstrates how to:
-1. Process HTML files from an input directory
-2. Translate web novel chapters using the Intelligo class
-3. Save translated content to an output directory
-4. Handle errors and provide progress feedback
-
-Prerequisites:
-1. Set the GEMINI_API_KEY environment variable
-2. Install dependencies: pip install -r requirements.txt
-3. Ensure HTML files are in the input directory
-"""
-
-import os
-import sys
+from intelligo.scraper import scrape
+from intelligo.translator import Translator
 from pathlib import Path
-from typing import List, Optional
-from intelligo import Intelligo
-from intelligo.exceptions import ConfigNotLoadedError, ScraperError
+from dotenv import load_dotenv
+import os
 
-def setup_environment() -> bool:
+input_folder = Path(__file__).parent / 'folder'
+input_folder.mkdir(parents=True, exist_ok=True)
+output_folder = Path(__file__).parent / 'output'
+output_folder.mkdir(parents=True, exist_ok=True)
+
+load_dotenv(Path(__file__).parent / '.env')
+gemini_api_key = os.getenv('GEMINI_API_KEY')
+translator = Translator(gemini_api_key)
+
+def get_previous_chapters_context(current_file, context_folder, max_chapters=3) -> str | None:
     """
-    Check if the required environment variables are set.
-    
+    Get the content of the previous max_chapters files in the context_folder.
+
+    Parameters:
+        current_file (Path): The current file being processed
+        context_folder (Path): The folder containing previously translated chapters
+        max_chapters (int): The maximum number of previous chapters to include in the context
+
     Returns:
-        bool: True if environment is properly configured, False otherwise
+        str | None: A string containing the content of the previous chapters wrapped in <previous_chapter_for_context> tags,
+                     or None if no previous chapters are found.
     """
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        print("❌ Error: GEMINI_API_KEY environment variable is not set.")
-        print("Please set it with: export GEMINI_API_KEY='your-api-key-here'")
-        return False
-    
-    print("✅ Environment configured successfully")
-    return True
+    existing_outputs = sorted(context_folder.glob('*.md'))
 
-def get_html_files(input_dir: Path) -> List[Path]:
-    """
-    Get all HTML files from the input directory.
-    
-    Args:
-        input_dir: Path to the directory containing HTML files
-        
-    Returns:
-        List of Path objects for HTML files
-    """
-    if not input_dir.exists():
-        raise FileNotFoundError(f"Input directory '{input_dir}' does not exist")
-    
-    html_files = list(input_dir.glob("*.html"))
-    html_files.extend(input_dir.glob("*.htm"))
-    
-    # Sort files naturally (e.g., chapter1.html, chapter2.html, ...)
-    html_files.sort(key=lambda x: x.name.lower())
-    
-    return html_files
+    if not existing_outputs:
+        return None
 
-def create_output_directory(output_dir: Path) -> None:
-    """
-    Create the output directory if it doesn't exist.
-    
-    Args:
-        output_dir: Path to the output directory
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"📁 Output directory ready: {output_dir}")
+    current_output_name = current_file.name.replace(".html", ".md")
 
-def translate_single_file(
-    html_file: Path, 
-    output_dir: Path, 
-    additional_instructions: Optional[str] = None
-) -> bool:
-    """
-    Translate a single HTML file using Intelligo.
-    
-    Args:
-        html_file: Path to the HTML file to translate
-        output_dir: Directory to save the translated content
-        additional_instructions: Optional additional translation instructions
-        
-    Returns:
-        bool: True if translation was successful, False otherwise
-    """
-    try:
-        print(f"🔄 Processing: {html_file.name}")
+    previous_files = []
+    for output_file in existing_outputs:
+        if output_file.name == current_output_name:
+            break
+        previous_files.append(output_file)
 
-        # Initialize Intelligo with the HTML file
-        translator = Intelligo(
-            input_file=html_file,
-            additional_instructions=additional_instructions
-        )
+    # Take the last max_chapters files
+    context_files = previous_files[-max_chapters:]
 
-        # Translate the chapter
-        translated_chapter = translator.translate_chapter()
+    if not context_files:
+        return None
 
-        # Determine output directory and filename using novel title
-        novel_title = translated_chapter.novel_title.strip()
-        novel_dir = output_dir / novel_title
-        novel_dir.mkdir(parents=True, exist_ok=True)
-        output_filename = html_file.stem + ".md"
-        output_file = novel_dir / output_filename
+    context_chapters = []
+    for file_path in context_files:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as fi:
+                content = fi.read().strip()
+                context_chapters.append(f'<previous_chapter_for_context>\n{content}\n</previous_chapter_for_context>')
+        except Exception as e:
+            print(f"Warning: Could not read {file_path}: {e}")
+            continue
 
-        # if output_file.exists():
-        #     print(f"⏩ Skipping {html_file.name}: already translated as {output_filename}")
-        #     return True
+    if not context_chapters:
+        return None
 
-        # Save the translated content
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(translated_chapter.content)
+    return '\n\n'.join(context_chapters)
 
-        print(f"✅ Successfully translated: {html_file.name} -> {output_file}")
-        print(f"   Novel: {translated_chapter.novel_title}")
-        if translated_chapter.chapter_title:
-            print(f"   Chapter: {translated_chapter.chapter_title}")
-        print(f"   Chapter Number: {translated_chapter.number}")
-
-        return True
-
-    except ConfigNotLoadedError as e:
-        print(f"❌ Configuration error: {e}")
-        return False
-    except ScraperError as e:
-        print(f"❌ Translation error for {html_file.name}: {e}")
-        return False
-    except Exception as e:
-        print(f"❌ Unexpected error processing {html_file.name}: {e}")
-        return False
 
 def main():
-    """
-    Main function to process HTML files from input directory and translate them.
-    """
-    print("🚀 Intelligo HTML Translation Example")
-    print("=" * 50)
-    
-    # Check environment setup
-    if not setup_environment():
-        return sys.exit(1)
-    
-    # Configuration
-    input_directory = Path("input_html")  # Directory containing HTML files
-    output_directory = Path("translated_chapters")  # Directory for translated output
-    
-    # Helper to get previous N chapters for a novel
-    def get_previous_chapters_content(novel_dir, current_chapter_filename, n=3):
-        if not novel_dir.exists():
-            return []
-        # List all .md files except the current one
-        files = [f for f in sorted(novel_dir.glob("*.md"), key=lambda x: x.name) if f.name != current_chapter_filename]
-        # Get last n files
-        prev_files = files[-n:]
-        contents = []
-        for f in prev_files:
-            try:
-                with open(f, "r", encoding="utf-8") as file:
-                    contents.append(file.read())
-            except Exception:
-                pass
-        return contents
-    
-    try:
-        # Get all HTML files from input directory
-        html_files = get_html_files(input_directory)
-        
-        if not html_files:
-            print(f"⚠️  No HTML files found in '{input_directory}'")
-            print("Please add HTML files to the input directory and try again.")
-            return
-        
-        print(f"📚 Found {len(html_files)} HTML file(s) to process")
-        
-        # Create output directory
-        create_output_directory(output_directory)
-        
-        # Process each HTML file
-        successful_translations = 0
-        failed_translations = 0
-        
-        for i, html_file in enumerate(html_files, 1):
-            print(f"\n[{i}/{len(html_files)}] Processing file...")
+    for item in sorted(input_folder.glob('*.html')):
+        print(f"Processing file: {item.name}")
 
-            # Scrape chapter to get novel title before translation
-            try:
-                i = Intelligo(input_file=html_file)
-                scraped = i.scrape_chapter()
-                novel_title = scraped.novel_title.strip()
-            except Exception as e:
-                print(f"❌ Error scraping {html_file.name}: {e}")
-                failed_translations += 1
-                continue
+        scraped_chapter = scrape(item)
 
-            novel_dir = output_directory / novel_title
-            output_filename = html_file.stem + ".md"
-            output_file = novel_dir / output_filename
+        previous_translated_chapters = get_previous_chapters_context(item, output_folder)
 
-            # Check if output file already exists before translating
-            if output_file.exists():
-                print(f"⏩ Skipping {html_file.name}: already translated as {output_filename}")
-                successful_translations += 1
-                continue
+        translated_chapter = translator.translate(
+            raw_chapter=scraped_chapter,
+            additional_instructions=previous_translated_chapters,
+        )
+        filepath = output_folder / item.name.replace(".html", ".md")
 
-            # Get previous chapters for this novel
-            previous_contents = get_previous_chapters_content(novel_dir, output_filename, n=3)
-            additional_instructions = "".join(
-                f"<previous_chapter_for_context>\n{content}\n</previous_chapter_for_context>\n" for content in previous_contents
-            )
+        with open(filepath, 'w', encoding='utf-8') as f:
+            if translated_chapter.chapter_number and translated_chapter.chapter_title:
+                f.write(f'# Chapter {translated_chapter.chapter_number}: {translated_chapter.chapter_title}\n\n')
+            elif translated_chapter.chapter_number:
+                f.write(f'# Chapter {translated_chapter.chapter_number}\n\n')
+            f.write(translated_chapter.translated_text)
 
-            # Translate with previous chapters as context
-            success = translate_single_file(
-                html_file=html_file,
-                output_dir=output_directory,
-                additional_instructions=additional_instructions
-            )
+        print(f"Translated chapter saved to: {filepath}")
 
-            if success:
-                successful_translations += 1
-            else:
-                failed_translations += 1
-        
-        # Print summary
-        print("\n" + "=" * 50)
-        print("📊 Translation Summary")
-        print(f"✅ Successful: {successful_translations}")
-        print(f"❌ Failed: {failed_translations}")
-        print(f"📁 Output directory: {output_directory.absolute()}")
-        
-        if successful_translations > 0:
-            print(f"🎉 Translation completed! Check '{output_directory}' for results.")
-        
-    except FileNotFoundError as e:
-        print(f"❌ Error: {e}")
-        print(f"Please create the '{input_directory}' directory and add HTML files to it.")
-    except KeyboardInterrupt:
-        print("\n⏹️  Translation interrupted by user")
-    except Exception as e:
-        print(f"❌ Unexpected error: {e}")
 
 if __name__ == "__main__":
-    # Example of how to use the script with different configurations
-    
-    # Option 1: Use default settings (uncomment to use)
     main()
-    
-    # Option 2: Custom directory paths (uncomment and modify to use)
-    # input_dir = Path("my_novels/raw_html")
-    # output_dir = Path("my_novels/translated")
-    # # ... modify main() function to use these paths
-    
-    # Option 3: Process a single file (uncomment to use)
-    # single_file = Path("input_html/chapter001.html")
-    # output_dir = Path("translated_chapters")
-    # if single_file.exists():
-    #     create_output_directory(output_dir)
-    #     translate_single_file(single_file, output_dir)

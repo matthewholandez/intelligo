@@ -1,84 +1,80 @@
-from bs4 import BeautifulSoup
 from pathlib import Path
-import re
-from intelligo.exceptions import ScraperError
-from intelligo.types import RawChapter
+from intelligo.types import ScrapedChapter, ScrapedChapterMetadata
+from intelligo.exceptions import InvalidSourceFileError
+from trafilatura import extract, extract_metadata
+from trafilatura.metadata import Document
+from urllib.parse import urlparse
+from intelligo.sites.booktoki import BookTokiScraper
 
 
-class WebNovelScraper:
+def scrape(source_file: Path) -> ScrapedChapter:
     """
-    Handles web scraping functionality for web novel content.
+    Scrape a chapter from the source HTML file.
     """
-    
-    def __init__(self, input_file: Path, css_selectors: dict):
-        """
-        Initialize the scraper with an HTML file and CSS selectors.
-        
-        Args:
-            input_file: Path to the HTML file to scrape
-            css_selectors: Dictionary containing CSS selectors for scraping
-        """
-        self.input_file = input_file
-        self.css_selectors = css_selectors
-        self.soup = self._load_html()
+
+    if not source_file.glob("*.html"):
+        raise InvalidSourceFileError("The source file is not a valid HTML file.")
+
+    with open(source_file, "r") as f:
+        html_content: str = f.read()
+
+    metadata = extract_metadata(html_content)
+    if not metadata.url and metadata.title:
+        raise InvalidSourceFileError("The source file could not be read.")
+    detailed_metadata = get_detailed_metadata(metadata)
+
+    raw_text = extract(html_content)
+    text = process_raw_text(metadata=metadata, raw_text=raw_text)
+
+    return ScrapedChapter(
+        raw_text=text,
+        metadata=detailed_metadata
+    )
 
 
-    def scrape_chapter(self) -> RawChapter:
-        """
-        Extracts the novel title and content from the web page.
-        """
-        novel_content = self.soup.select_one(self.css_selectors["chapter_content"])
-        if novel_content and len(novel_content.contents) >= 4:
-            content_container = novel_content.contents[3]
-            
-            # First try to find paragraph tags
-            paragraphs = content_container.find_all("p")
-            if paragraphs:
-                formatted_novel_content = "\n\n".join(p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True))
-            else:
-                # If no paragraphs found, try div tags
-                divs = content_container.find_all("div")
-                if divs:
-                    # Filter out divs that only contain <br> tags or are empty
-                    text_divs = []
-                    for div in divs:
-                        text_content = div.get_text(strip=True)
-                        if text_content and text_content != "":
-                            text_divs.append(text_content)
-                    formatted_novel_content = "\n\n".join(text_divs)
-                else:
-                    raise ScraperError("No paragraph or div content found.")
-            
-            if not formatted_novel_content:
-                raise ScraperError("No readable content found.")
-        else:
-            raise ScraperError("Chapter content not found.")
+def get_detailed_metadata(metadata: Document) -> ScrapedChapterMetadata:
+    """
+    Try to extract the novel title and chapter number.
+    Works best if the site is known.
+    """
 
-        raw_title = self.soup.select_one('.bottom-wrapper > div:nth-child(2) > div:nth-child(1)').contents[0].strip()
-        if not raw_title:
-            raise ScraperError("Novel title not found.")
-        
-        chapter_match = re.search(r'(\d+)화', raw_title)
-        if chapter_match:
-            chapter_number = int(chapter_match.group(1))
-        else:
-            chapter_number = 1
-        
-        novel_title = re.sub(r'-?\d+화$', '', raw_title).strip() 
+    parsed_url = urlparse(metadata.url)
+    hostname = parsed_url.hostname
 
-        scraped_chapter = RawChapter(
-            novel_title=novel_title,
-            content=formatted_novel_content,
-            number=chapter_number
-        )
+    match hostname:
+        case "booktoki468.com":
+            booktoki = BookTokiScraper(metadata)
+            return ScrapedChapterMetadata(
+                novel_title=booktoki.get_novel_title(),
+                chapter_number=booktoki.get_chapter_number(),
+            )
+        case _:
+            return ScrapedChapterMetadata(
+                novel_title=metadata.title,
+                chapter_number=None,
+            )
 
-        return scraped_chapter
-    
 
-    def _load_html(self) -> BeautifulSoup:
-        """
-        Loads the HTML content from the input file.
-        """
-        with open(self.input_file, "r", encoding="utf-8") as file:
-            html_content = file.read()
-        return BeautifulSoup(html_content, "html.parser")
+def process_raw_text(metadata: Document, raw_text: str) -> str:
+    """
+    If the site is known, apply post-processing to the raw text.
+    This is useful for sites that have a specific format or structure.
+    """
+    parsed_url = urlparse(metadata.url)
+    hostname = parsed_url.hostname
+
+    match hostname:
+        case "booktoki468.com":
+            return '\n'.join(raw_text.split('\n')[:-1])
+        case _:
+            return raw_text
+
+
+class Scraper:
+    """
+    Scrape features of a web novel chapter from
+    a source HTML file.
+    """
+
+    def __init__(self) -> None:
+        pass
