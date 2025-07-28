@@ -35,7 +35,7 @@ class GeminiChapterResponse(BaseModel):
     translated_text: str
 
 
-class GeminiConfig(BaseModel):
+class IntelligoConfigGemini(BaseModel):
     """
     Gemini configuration.
     """
@@ -44,8 +44,17 @@ class GeminiConfig(BaseModel):
     thinking_budget: int
 
 
+class IntelligoConfigConstants(BaseModel):
+    """
+    Constants configuration.
+    """
+    max_attempts: int
+    acceptable_line_count_ratio: float
+
+
 class IntelligoConfig(BaseModel):
     """
     Configuration model.
     """
-    gemini: GeminiConfig
+    gemini: IntelligoConfigGemini
+    constants: IntelligoConfigConstants
