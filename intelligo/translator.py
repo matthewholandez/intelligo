@@ -49,11 +49,20 @@ class Translator:
                     response_schema=GeminiChapterResponse
                 )
             )
-            translated_text_length = len([x for x in response.parsed.splitlines() if x != ""])
+            
+            # Check if the parsed response is of the expected type
+            if not isinstance(response.parsed, GeminiChapterResponse):
+                attempts += 1
+                continue
+
+            parsed_response = response.parsed
+            translated_text_length = len([x for x in parsed_response.translated_text.splitlines() if x != ""])
             if translated_text_length > (raw_text_length * self.config.constants.acceptable_line_count_ratio):
-                parsed_response = response.parsed
                 break
             attempts += 1
+        else:
+            # This block executes if the while loop completes without a break
+            raise Exception("Failed to get a valid translation after maximum attempts.")
 
         return TranslatedChapter(
             novel_title=raw_chapter.metadata.novel_title,

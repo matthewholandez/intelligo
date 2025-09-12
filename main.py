@@ -67,6 +67,11 @@ def main(input_dir: Path, output_dir: Path):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for item in sorted(input_dir.glob('*.html')):
+        output_filepath = output_dir / item.name.replace(".html", ".md")
+        if output_filepath.exists():
+            print(f"Skipping already translated file: {item.name}")
+            continue
+
         print(f"Processing file: {item.name}")
 
         scraped_chapter = scrape(item)
