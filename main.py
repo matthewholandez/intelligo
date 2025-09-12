@@ -3,14 +3,10 @@ from intelligo.translator import Translator
 from pathlib import Path
 from dotenv import load_dotenv
 import os
-
-input_folder = Path(__file__).parent / 'folder'
-input_folder.mkdir(parents=True, exist_ok=True)
-output_folder = Path(__file__).parent / 'output'
-output_folder.mkdir(parents=True, exist_ok=True)
+import click
 
 load_dotenv(Path(__file__).parent / '.env')
-gemini_api_key = os.getenv('GEMINI_API_KEY')
+gemini_api_key = os.getenv('GEMINI_API_KEY', '')
 translator = Translator(gemini_api_key)
 
 def get_previous_chapters_context(current_file, context_folder, max_chapters=3) -> str | None:
@@ -61,19 +57,27 @@ def get_previous_chapters_context(current_file, context_folder, max_chapters=3) 
     return '\n\n'.join(context_chapters)
 
 
-def main():
-    for item in sorted(input_folder.glob('*.html')):
+@click.command()
+@click.option('--input-dir', default='input', help='The directory containing the HTML files to be translated.', type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option('--output-dir', default='output', help='The directory where the translated Markdown files will be saved.', type=click.Path(file_okay=False, path_type=Path))
+def main(input_dir: Path, output_dir: Path):
+    """
+    A CLI tool to translate HTML chapters into Markdown files.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    for item in sorted(input_dir.glob('*.html')):
         print(f"Processing file: {item.name}")
 
         scraped_chapter = scrape(item)
 
-        previous_translated_chapters = get_previous_chapters_context(item, output_folder)
+        previous_translated_chapters = get_previous_chapters_context(item, output_dir)
 
         translated_chapter = translator.translate(
             raw_chapter=scraped_chapter,
             additional_instructions=previous_translated_chapters,
         )
-        filepath = output_folder / item.name.replace(".html", ".md")
+        filepath = output_dir / item.name.replace(".html", ".md")
 
         with open(filepath, 'w', encoding='utf-8') as f:
             if translated_chapter.chapter_number and translated_chapter.chapter_title:

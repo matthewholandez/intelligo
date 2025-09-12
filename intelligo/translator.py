@@ -49,7 +49,7 @@ class Translator:
                     response_schema=GeminiChapterResponse
                 )
             )
-            translated_text_length = len([x for x in response.parsed.translated_text.splitlines() if x != ""])
+            translated_text_length = len([x for x in response.parsed.splitlines() if x != ""])
             if translated_text_length > (raw_text_length * self.config.constants.acceptable_line_count_ratio):
                 parsed_response = response.parsed
                 break
