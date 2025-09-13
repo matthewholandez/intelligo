@@ -4,6 +4,8 @@
     <h3>Translate your favourite Asian web novels to English</h3>
 </div>
 
+![Python 3.11+](https://img.shields.io/badge/python-%3E=3.11-blue?logo=python)
+
 # Installation
 First, clone this repository:
 ```bash
