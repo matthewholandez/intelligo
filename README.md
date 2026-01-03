@@ -6,6 +6,8 @@
 
 ![Python 3.11+](https://img.shields.io/badge/python-%3E=3.11-blue?logo=python)
 
+⚠️ **This project is currently being rewritten under the `rewrite` branch.**
+
 # Installation
 First, clone this repository:
 ```bash
