@@ -2,6 +2,7 @@ __pycache__/
 .venv/
 input/
 output/
+term_glossary.json
 *.html
 .DS_Store
 .env

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ScrapedChapterMetadata(BaseModel):
@@ -27,12 +27,21 @@ class TranslatedChapter(BaseModel):
     translated_text: str
 
 
+class GlossaryUpdate(BaseModel):
+    """
+    Represents a candidate terminology mapping.
+    """
+    source_term: str
+    preferred_translation: str
+
+
 class ChapterResponse(BaseModel):
     """
     Represents the output format the LLM should return.
     """
     chapter_title: str | None
     translated_text: str
+    glossary_updates: list[GlossaryUpdate] = Field(default_factory=list)
 
 
 class IntelligoConfigOpenRouter(BaseModel):

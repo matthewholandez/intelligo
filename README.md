@@ -22,4 +22,12 @@ Edit `.env` by replacing `your_key_here` [with your actual OpenRouter API key.](
 python main.py --help
 ```
 
+By default, Intelligo now builds a persistent glossary at `output/term_glossary.json` during translation.
+This glossary is automatically fed back into later chapters to keep names and key terms consistent.
+
+You can override the glossary location:
+```bash
+python main.py --input-dir input --output-dir output --glossary-file ./my_glossary.json
+```
+
 Note: Intelligo is currently only compatible with HTML files from certain web novel sites.

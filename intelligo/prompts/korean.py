@@ -1,4 +1,8 @@
-def get_korean_prompt(source_text: str, additional_instructions: str | None) -> str:
+def get_korean_prompt(
+    source_text: str,
+    additional_instructions: str | None,
+    glossary_instructions: str | None,
+) -> str:
     """
     Returns the Korean translation prompt.
     """
@@ -158,8 +162,22 @@ def get_korean_prompt(source_text: str, additional_instructions: str | None) -> 
     5. Verify uniformity in names, terms, and stylistic choices.
     6. Verify that emotional impact, readability, and cultural authenticity have been maintained.
     7. Confirm that the paragraph/line structure of the original text has not been altered.
-    8. Return only the translated text, without any additional explanation, commentary or formatting.
+    8. Return only a JSON object with the required schema (no prose outside JSON).
     </translation_process>
+
+    <output_schema>
+    Return valid JSON with these fields:
+    - chapter_title: string or null
+    - translated_text: string
+    - glossary_updates: array of objects with fields:
+      - source_term: string (Korean source term/name)
+      - preferred_translation: string (English canonical rendering)
+
+    glossary_updates rules:
+    - Include only stable terms that benefit from future consistency (names, titles, factions, realms, skills, key items).
+    - Do not include common words, one-off phrases, or uncertain mappings.
+    - If no new stable terms appear, return an empty array.
+    </output_schema>
 
     <chapter_titling_process>
     1. Read the complete passage.
@@ -167,6 +185,8 @@ def get_korean_prompt(source_text: str, additional_instructions: str | None) -> 
     3. There might NOT be a chapter title. In this case, you may set the chapter title as null.
     4. The chapter title is NOT the novel title, which will be provided to you so you do not mistake the two.
     </chapter_titling_process>
+
+    {f"<glossary_reference>{chr(10)}Use this dictionary for exact consistency whenever a listed term appears.{chr(10)}{glossary_instructions}{chr(10)}</glossary_reference>" if glossary_instructions else ""}
 
     {f"<additional_instructions>{chr(10)}{additional_instructions}{chr(10)}</additional_instructions>" if additional_instructions else ""}
 

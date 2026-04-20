@@ -7,7 +7,6 @@ import click
 
 load_dotenv(Path(__file__).parent / '.env')
 openrouter_api_key = os.getenv('OPENROUTER_API_KEY', '')
-translator = Translator(openrouter_api_key)
 
 def get_previous_chapters_context(current_file, context_folder, max_chapters=3) -> str | None:
     """
@@ -60,11 +59,14 @@ def get_previous_chapters_context(current_file, context_folder, max_chapters=3) 
 @click.command()
 @click.option('--input-dir', default='input', help='The directory containing the HTML files to be translated.', type=click.Path(exists=True, file_okay=False, path_type=Path))
 @click.option('--output-dir', default='output', help='The directory where the translated Markdown files will be saved.', type=click.Path(file_okay=False, path_type=Path))
-def main(input_dir: Path, output_dir: Path):
+@click.option('--glossary-file', default=None, help='Optional path to a persistent glossary JSON file.', type=click.Path(dir_okay=False, path_type=Path))
+def main(input_dir: Path, output_dir: Path, glossary_file: Path | None):
     """
     A CLI tool to translate HTML chapters into Markdown files.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
+    glossary_path = glossary_file if glossary_file else output_dir / 'term_glossary.json'
+    translator = Translator(openrouter_api_key, glossary_path=glossary_path)
 
     for item in sorted(input_dir.glob('*.html')):
         output_filepath = output_dir / item.name.replace(".html", ".md")
