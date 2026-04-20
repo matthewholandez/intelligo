@@ -6,23 +6,16 @@
 
 ![Python 3.11+](https://img.shields.io/badge/python-%3E=3.11-blue?logo=python)
 
-⚠️ **This project is currently being rewritten under the `rewrite` branch.**
-
 # Installation
-First, clone this repository:
 ```bash
 git clone https://github.com/matthewholandez/intelligo
-```
-Then, install dependencies:
-```bash
 cd intelligo
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-```
-Then, configure your Gemini API key for translation:
-```bash
 mv .env.example .env
 ```
-Finally, edit `.env` by replacing `your_key_here` [with your actual API key.](http://console.cloud.google.com/)
+Edit `.env` by replacing `your_key_here` [with your actual OpenRouter API key.](https://openrouter.ai/keys)
 
 # Usage
 ```bash

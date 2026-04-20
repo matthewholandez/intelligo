@@ -27,21 +27,20 @@ class TranslatedChapter(BaseModel):
     translated_text: str
 
 
-class GeminiChapterResponse(BaseModel):
+class ChapterResponse(BaseModel):
     """
-    Represents the output format Gemini should return.
+    Represents the output format the LLM should return.
     """
     chapter_title: str | None
     translated_text: str
 
 
-class IntelligoConfigGemini(BaseModel):
+class IntelligoConfigOpenRouter(BaseModel):
     """
-    Gemini configuration.
+    OpenRouter configuration.
     """
     model: str
     temperature: float
-    thinking_budget: int
 
 
 class IntelligoConfigConstants(BaseModel):
@@ -56,5 +55,5 @@ class IntelligoConfig(BaseModel):
     """
     Configuration model.
     """
-    gemini: IntelligoConfigGemini
+    openrouter: IntelligoConfigOpenRouter
     constants: IntelligoConfigConstants

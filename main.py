@@ -6,8 +6,8 @@ import os
 import click
 
 load_dotenv(Path(__file__).parent / '.env')
-gemini_api_key = os.getenv('GEMINI_API_KEY', '')
-translator = Translator(gemini_api_key)
+openrouter_api_key = os.getenv('OPENROUTER_API_KEY', '')
+translator = Translator(openrouter_api_key)
 
 def get_previous_chapters_context(current_file, context_folder, max_chapters=3) -> str | None:
     """
