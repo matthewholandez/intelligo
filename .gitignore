@@ -1,12 +1,19 @@
+# Development
 __pycache__/
 .venv/
+.idea/
+.DS_Store
+.env
+.env.local
+.python-version
+.vscode
+*.db
+
+# Intelligo-specific
 input/
 output/
 term_glossary.json
 *.html
-.DS_Store
-.env
-translated_chapters/
-input_html/
-.idea/
-*.html
+
+# Agentic development tools
+.claude/
