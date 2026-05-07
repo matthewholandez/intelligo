@@ -12,6 +12,7 @@ __pycache__/
 # Intelligo-specific
 input/
 output/
+series/
 term_glossary.json
 *.html
 
