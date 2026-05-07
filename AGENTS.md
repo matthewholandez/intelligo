@@ -1,62 +1,71 @@
-# CLAUDE.md
+# AGENTS.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this is
 
-Intelligo is a CLI tool that translates Asian web novel chapters (HTML) into English Markdown, using LLMs via OpenRouter. Korean is the only fully wired language at the moment; a Chinese prompt exists but isn't reachable from `scrape()` yet.
+Intelligo is becoming a web app for translating Asian web novel chapters into English — *a reading room that happens to translate*. The product vision lives in `DESIGN_SPEC.md`; treat that document as the source of truth for frontend tone, scope, naming, and roadmap.
 
-The repo's current `ui-rewrite` branch also contains design artifacts for an eventual web frontend — `DESIGN_SPEC.md`, `mockup.html`, `branding/` — but no frontend code yet. The shipping product is still the CLI.
+This branch (`ui-rewrite`) is mid-rewrite. The previous incarnation was a CLI built around Trafilatura, a Korean prompt, and a self-building glossary. That code has been deleted. The repo is being rebuilt around a FastAPI backend in `api/` and an eventual Next.js frontend (not yet started).
 
-## Commands
+## Repo layout
 
-```bash
-# setup (one-time)
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-mv .env.example .env   # then add OPENROUTER_API_KEY
-
-# run
-python main.py --help
-python main.py                                   # defaults: input/ -> output/, glossary at output/term_glossary.json
-python main.py --input-dir <dir> --output-dir <dir> --glossary-file <path>
+```
+api/                FastAPI backend — the only running code right now
+  main.py           app, lifespan, route handlers
+  db.py             sqlite connection + schema
+  schemas.py        Pydantic request/response models
+  translator.py     OpenRouter call
+  requirements.txt
+  .env.example
+DESIGN_SPEC.md      Frontend design spec — canonical for visual + product direction
+mockup.html         Static design mockup
+mockup.css
+testform.html       Scratch HTML form for hitting the API by hand
 ```
 
 There is no test suite, lint config, or build step. Don't invent commands for them.
 
+## Running the API
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+cd api
+pip install -r requirements.txt
+cp .env.example .env   # then add OPENROUTER_API_KEY
+uvicorn main:app --reload
+```
+
+The sqlite database (`api/intelligo.db`) is created on first launch from the schema in `db.py`. It's gitignored; deleting it is a clean reset.
+
+## API surface (current)
+
+| Method | Path                | Status                                                                                       |
+| ------ | ------------------- | -------------------------------------------------------------------------------------------- |
+| GET    | `/api/series`       | implemented — `?id=<uuid>` lookup, 404 if missing                                            |
+| POST   | `/api/series`       | implemented — JSON `{name}`, 400 if name > 150 chars                                         |
+| POST   | `/api/translations` | partial — `chapterBody` (text) translates via OpenRouter; `chapterFile` returns 501 for now  |
+
+`/api/translations` is a multipart form endpoint with **camelCase aliases on the wire** (`seriesId`, `chapterNumber`, `chapterBody`, `chapterFile`, `overwriteChapterIfExists`) — Python params stay snake_case but the alias is what clients send. Keep that distinction when adding fields.
+
 ## Architecture
 
-The pipeline is three stages, orchestrated by `main.py`:
+The backend is a flat FastAPI app — no routers, no service layer, no DI framework. Four files, one job each:
 
-1. **`scraper.scrape(html_file)`** → `ScrapedChapter` (raw text + metadata).
-   Trafilatura does generic extraction; site-specific dispatch in `get_detailed_metadata()` and `process_raw_text()` matches on URL hostname. Only `booktoki468.com` has a custom path right now (`intelligo/sites/booktoki.py`).
-2. **`Translator.translate(chapter, additional_instructions)`** → `TranslatedChapter`.
-   Builds a Korean translation prompt, POSTs to OpenRouter, retries up to `max_attempts` until the response passes a line-count sanity check (`acceptable_line_count_ratio`, default 0.75 of source non-empty lines). On success, merges any `glossary_updates` from the model into the persisted glossary.
-3. **`main.py`** writes the result as Markdown.
+- **`main.py`** — owns the app, the lifespan (opens/closes the sqlite connection on `app.state.db`), and every route handler.
+- **`db.py`** — returns a connection with the schema applied. Schema is idempotent (`CREATE TABLE IF NOT EXISTS`).
+- **`schemas.py`** — Pydantic models. The wire contract for JSON endpoints.
+- **`translator.py`** — wraps the OpenRouter call. Model and temperature are constants in this file, not config; change them here.
 
-Three cross-cutting behaviors are load-bearing and easy to miss:
-
-- **Self-building glossary.** Each translation can return `glossary_updates`; new entries are appended to `term_glossary.json` (never overwriting existing keys, to keep canonical translations stable). On the next chapter, all current entries are injected into the prompt as `source => preferred_translation` lines. This is what keeps proper-noun translations consistent across a long novel.
-- **Previous-chapter context.** `get_previous_chapters_context()` in `main.py` reads up to the 3 most-recently-translated `.md` files in the output directory (sorted lexicographically) and passes them to the translator wrapped in `<previous_chapter_for_context>` tags. Naming input files so that lexicographic sort matches reading order matters.
-- **Resume-by-skipping.** `main.py` skips any input HTML whose corresponding `.md` already exists in the output directory. To re-translate a chapter, delete its output file. There is no `--force` flag.
-
-## Adding a new source site
-
-1. New class in `intelligo/sites/<site>.py` exposing at minimum `get_novel_title()` and `get_chapter_number()`. Mirror `BookTokiScraper`.
-2. Add a `case "<hostname>":` arm to **both** `get_detailed_metadata()` and `process_raw_text()` in `intelligo/scraper.py` — the hostname must match what `urlparse(metadata.url).hostname` returns (e.g., `booktoki468.com`, including subdomain).
-
-## Adding a new source language
-
-Prompts live in `intelligo/prompts/<lang>.py` as a single `get_<lang>_prompt(source_text, additional_instructions, glossary_instructions)` function. `translator.py` currently hardcodes `get_korean_prompt`; switching languages today means editing that import. There is no language-detection or routing layer yet.
-
-## Configuration surfaces
-
-- `intelligo/config.toml` — committed. Model, temperature, retry constants. Change the model here, not in code.
-- `.env` — gitignored. `OPENROUTER_API_KEY` only.
-- CLI flags — input dir, output dir, glossary path. No flag for model or language.
+Translations currently run synchronously in the request handler. `DESIGN_SPEC.md` §5.4 describes a "press" — a queue with human-voiced status updates the frontend polls — but no async job machinery exists yet.
 
 ## Conventions worth knowing
 
-- Pydantic models in `intelligo/types.py` are the contract between stages — `ScrapedChapter`, `TranslatedChapter`, `ChapterResponse` (the LLM's expected JSON shape), `GlossaryUpdate`. Changing any of these ripples through the pipeline.
-- The model is asked for `response_format: {"type": "json_object"}`, but the code still defensively strips ```` ``` ```` fences before `model_validate_json` because not every OpenRouter model honors it.
-- Glossary writes use `ensure_ascii=False` — the file is UTF-8 and contains Hangul. Don't change that.
+- **One sqlite connection** lives on `app.state.db`, opened in lifespan. `check_same_thread=False` is required because FastAPI runs sync handlers on a thread pool. SELECTs do not need `commit()`.
+- **OpenRouter, not OpenAI.** The `openrouter` PyPI package is what we use; don't swap to the OpenAI SDK without a reason.
+- **`.env` lives in `api/`**, not the repo root. `load_dotenv()` is called from `api/main.py` and resolves it via cwd, which is why the run instructions `cd api` first.
+- **`*.db` is gitignored.** The sqlite file is local-only and disposable.
+
+## What's deliberately not here yet
+
+The CLI handled scraping (Trafilatura + per-hostname dispatch), Korean-specific prompts, a self-building glossary persisted to JSON, and previous-chapter context injection. None of that has been ported. When wiring those features back in, read `DESIGN_SPEC.md` first — the glossary in particular is reframed as the **Card Catalog** and is meant to be a first-class artifact, not a hidden file.
