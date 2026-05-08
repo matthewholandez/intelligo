@@ -17,5 +17,18 @@ class SeriesPostResponse(BaseModel):
 
 
 class TranslatedChapter(BaseModel):
-    name: str
+    name: str | None
     body: str
+
+
+class GlossaryEntry(BaseModel):
+    term: str
+    translation: str
+
+
+class GlossaryEntryList(BaseModel):
+    items: list[GlossaryEntry]
+
+
+class TranslateResponse(BaseModel):
+    ok: bool

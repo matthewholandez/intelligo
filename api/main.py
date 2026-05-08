@@ -9,7 +9,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from trafilatura import extract
 
 from db import connect
-from schemas import Series, SeriesPostRequest, SeriesPostResponse
+from schemas import Series, SeriesPostRequest, SeriesPostResponse, TranslateResponse
 from translator import translate_chapter
 
 load_dotenv()
@@ -78,7 +78,7 @@ def create_translation(
     overwrite_chapter_if_exists: Annotated[bool, Form(alias="overwriteChapterIfExists")] = False,
     chapter_file: Annotated[UploadFile | None, File(alias="chapterFile")] = None,
     chapter_body: Annotated[str | None, Form(alias="chapterBody")] = None,
-):
+) -> TranslateResponse:
     if chapter_file and chapter_body:
         raise HTTPException(status_code=422, detail="chapterFile and chapterBody cannot both be populated")
     if chapter_file is None and chapter_body is None:
@@ -88,14 +88,15 @@ def create_translation(
         raise HTTPException(status_code=400, detail="Invalid seriesId was provided")
 
     if chapter_body:
-        return translate_chapter(chapter_body, series_id)
+        translate_chapter(chapter_body, series_id, chapter_number, app.state.db)
+        return TranslateResponse(ok=True)
     
-    if chapter_file:
+    elif chapter_file:
         text = get_text_from_file(chapter_file)
         extracted_text = extract(text)
         if extracted_text:
-            return translate_chapter(extracted_text, series_id)
+            translate_chapter(extracted_text, series_id, chapter_number, app.state.db)
+            return TranslateResponse(ok=True)
         raise RuntimeError("Extraction failed")
 
-    # TODO: handle chapter_file (decode bytes, dispatch to scraper, then translate)
     raise HTTPException(status_code=501, detail="chapterFile uploads are not implemented yet")

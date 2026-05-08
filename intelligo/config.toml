@@ -1,7 +1,0 @@
-[openrouter]
-model = "google/gemini-2.5-flash" # Pick from https://openrouter.ai/models
-temperature = 0.3 # Explanation: https://openrouter.ai/docs/api-reference/parameters
-
-[constants]
-max_attempts = 7 # Maximum number of attempts Intelligo will make to OpenRouter to get a proper response (see below)
-acceptable_line_count_ratio = 0.75 # A proper response should have this percentage of the total lines in the source text
