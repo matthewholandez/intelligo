@@ -1,83 +1,82 @@
-import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Deckle } from "@/components/Deckle";
 import { Fleuron } from "@/components/Fleuron";
 import { Gloss } from "@/components/Gloss";
 import { Pagination } from "@/components/Pagination";
-import { glossByTerm, sampleChapter } from "@/lib/mock";
+import { fetchChapter, type GlossaryEntry } from "@/lib/api";
+
+const NUMBER_WORDS = [
+  "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+  "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+  "Seventeen", "Eighteen", "Nineteen", "Twenty",
+];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+function numberToWord(n: number): string {
+  if (n < 0) return String(n);
+  if (n <= 20) return NUMBER_WORDS[n];
+  if (n < 100) {
+    const t = Math.floor(n / 10);
+    const r = n % 10;
+    return r === 0 ? TENS[t] : `${TENS[t]}-${NUMBER_WORDS[r]}`;
+  }
+  return String(n);
+}
+
+function renderBody(body: string, glossary: GlossaryEntry[]) {
+  const paragraphs = body.split(/\n\n+/);
+  const byTerm = new Map<string, GlossaryEntry>();
+  for (const g of glossary) {
+    byTerm.set(g.translation, g);
+    byTerm.set(g.term, g);
+  }
+  const terms = [...byTerm.keys()].sort((a, b) => b.length - a.length);
+
+  return paragraphs.map((para, pi) => {
+    if (terms.length === 0) {
+      return <p key={pi}>{para}</p>;
+    }
+    const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const re = new RegExp(`(${escaped.join("|")})`, "g");
+    const parts = para.split(re);
+    return (
+      <p key={pi}>
+        {parts.map((part, i) => {
+          const entry = byTerm.get(part);
+          if (entry && i % 2 === 1) {
+            return <Gloss key={i} term={part} entry={entry} />;
+          }
+          return <span key={i}>{part}</span>;
+        })}
+      </p>
+    );
+  });
+}
 
 export default async function ChapterPage(
   props: PageProps<"/novel/[slug]/[chapter]">,
 ) {
   const { slug, chapter } = await props.params;
-  const ch = sampleChapter; // mock content for first draft
-  const chapterNumber = Number(chapter) || ch.number;
+  const number = Number(chapter);
+  if (!Number.isFinite(number)) notFound();
+
+  const ch = await fetchChapter(slug, number);
+  if (!ch) notFound();
 
   return (
-    <section className="chapter-shell" aria-label={`Chapter ${chapterNumber}`}>
-      <nav className="chapter-nav">
-        <Link href={`/novel/${slug}/${chapterNumber - 1}`}>
-          ‹ Chapter {chapterNumber - 1}
-        </Link>
-        <Link href={`/novel/${slug}/${chapterNumber + 1}`}>
-          Chapter {chapterNumber + 1} ›
-        </Link>
-      </nav>
-
+    <section className="chapter-shell" aria-label={`Chapter ${ch.number}`}>
       <div className="reading-ribbon" aria-hidden="true" />
 
       <article className="chapter">
         <Deckle />
 
-        <p className="chapter__eyebrow">Chapter {ch.numberWord}</p>
+        <p className="chapter__eyebrow">Chapter {numberToWord(ch.number)}</p>
         <h1 className="chapter__title">
-          <em>{ch.title}</em>
+          <em>{ch.name ?? `Chapter ${ch.number}`}</em>
         </h1>
 
         <div className="chapter__body">
-          <p>
-            The morning came in slowly, the way mornings do when nothing is
-            waiting for them.{" "}
-            <Gloss term="Dokja" entry={glossByTerm.Dokja} /> sat with his back
-            to the window and let the page stay open in his lap, unread. The
-            light moved across the print and made each line briefly important,
-            then unimportant again.
-          </p>
-          <p>
-            He had been told, the night before, that the{" "}
-            <Gloss term="Constellations" entry={glossByTerm.Constellations} />{" "}
-            had taken an interest in him, which was the kind of news a person
-            received without quite knowing what to do with their hands. He had
-            put his hands around a cup of tea, then around the cup&apos;s
-            saucer, then around nothing.
-          </p>
-          <p>
-            &ldquo;You&apos;re not afraid,&rdquo; she had said, not as a
-            question. He had not answered, because the truthful answer was
-            complicated and the comforting answer was a lie, and he had grown
-            old enough, at last, to refuse both.
-          </p>
-
-          <Fleuron variant="scene" />
-
-          <p>
-            By noon the rain had thinned the streets of everyone but the
-            unlucky and the determined. Dokja was both.{" "}
-            <Gloss term="Yoo Sangah" entry={glossByTerm["Yoo Sangah"]} />{" "}
-            walked half a step behind him with an umbrella she had not opened,
-            holding it the way one holds a closed book — patiently, as if its
-            time would come.
-          </p>
-          <p>
-            They reached the door without speaking. It was, against all
-            reasonable expectation, exactly as it had been described in the
-            book: green, with a small brass plate set just below the handle,
-            and a quiet to it that had nothing to do with the absence of sound.
-          </p>
-          <p>&ldquo;It looks ordinary,&rdquo; she said.</p>
-          <p>
-            &ldquo;Yes,&rdquo; Dokja said. &ldquo;That&apos;s the trouble.&rdquo;
-          </p>
-
+          {renderBody(ch.body, ch.glossary)}
           <Fleuron variant="end" />
         </div>
       </article>

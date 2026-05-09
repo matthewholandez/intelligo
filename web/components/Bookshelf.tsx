@@ -1,30 +1,32 @@
 import Link from "next/link";
-import { shelf } from "@/lib/mock";
+import { fetchNovels, type Novel } from "@/lib/api";
 
-export function Bookshelf() {
+async function loadNovels(): Promise<Novel[]> {
+  try {
+    return await fetchNovels();
+  } catch {
+    return [];
+  }
+}
+
+export async function Bookshelf() {
+  const novels = await loadNovels();
   return (
     <aside className="bookshelf" aria-label="Your shelf">
       <div className="bookshelf__mark">INTELLIGO</div>
-      {shelf.map((novel) => {
-        const cls = [
-          "spine",
-          novel.current ? "spine--current" : "",
-          novel.spineWidth === "thin" ? "spine--thin" : "",
-          novel.spineWidth === "wide" ? "spine--wide" : "",
-        ]
+      {novels.map((novel) => {
+        const cls = ["spine", novel.isCurrent ? "spine--current" : ""]
           .filter(Boolean)
           .join(" ");
-        const href = novel.current
-          ? `/novel/${novel.slug}/23`
-          : `/novel/${novel.slug}/1`;
+        const href = `/novel/${novel.slug}/1`;
         return (
           <Link
             key={novel.slug}
             href={href}
             className={cls}
-            aria-current={novel.current ? "true" : undefined}
+            aria-current={novel.isCurrent ? "true" : undefined}
           >
-            {novel.title}
+            {novel.name}
           </Link>
         );
       })}

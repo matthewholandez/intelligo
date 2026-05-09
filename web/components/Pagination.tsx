@@ -1,6 +1,5 @@
 import Link from "next/link";
-
-type ChapterRef = { number: number; title: string };
+import type { ChapterRef } from "@/lib/api";
 
 export function Pagination({
   slug,
@@ -8,18 +7,28 @@ export function Pagination({
   next,
 }: {
   slug: string;
-  prev: ChapterRef;
-  next: ChapterRef;
+  prev: ChapterRef | null;
+  next: ChapterRef | null;
 }) {
   return (
     <nav className="pagination">
-      <Link href={`/novel/${slug}/${prev.number}`}>
-        ‹ Chapter {prev.number} · {prev.title}
-      </Link>
+      {prev ? (
+        <Link href={`/novel/${slug}/${prev.number}`}>
+          ‹ Chapter {prev.number}
+          {prev.name ? ` · ${prev.name}` : ""}
+        </Link>
+      ) : (
+        <span />
+      )}
       <span className="pagination__between">❦</span>
-      <Link href={`/novel/${slug}/${next.number}`}>
-        Chapter {next.number} · {next.title} ›
-      </Link>
+      {next ? (
+        <Link href={`/novel/${slug}/${next.number}`}>
+          Chapter {next.number}
+          {next.name ? ` · ${next.name}` : ""} ›
+        </Link>
+      ) : (
+        <span />
+      )}
     </nav>
   );
 }

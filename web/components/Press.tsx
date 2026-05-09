@@ -1,6 +1,22 @@
-import { press } from "@/lib/mock";
+import { fetchPress, type PressItem } from "@/lib/api";
 
-export function Press() {
+async function loadPress(): Promise<PressItem[]> {
+  try {
+    return await fetchPress();
+  } catch {
+    return [];
+  }
+}
+
+export async function Press() {
+  const press = await loadPress();
+  if (press.length === 0) {
+    return (
+      <div className="press" aria-label="Chapters being translated">
+        <p className="press__status">The press is quiet.</p>
+      </div>
+    );
+  }
   return (
     <div className="press" aria-label="Chapters being translated">
       {press.map((row, i) => (
