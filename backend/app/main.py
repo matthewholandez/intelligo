@@ -2,39 +2,20 @@
 Home for Intelligo's main API logic.
 """
 
-from fastapi import FastAPI, Depends, HTTPException, Query, Body
-from sqlmodel import Field, Session, SQLModel, create_engine, select
-from pydantic import BaseModel
+from fastapi import FastAPI, Depends, HTTPException, Query
+from sqlmodel import Session, SQLModel, create_engine, select
 
 from contextlib import asynccontextmanager
 
-from typing import Annotated, Sequence
-from datetime import date, datetime
+from typing import Annotated
 
 
 # ================================
 # DATA MODELS
 # ================================
-class NovelBase(SQLModel):
-    name: str = Field(index=True)
 
-class Novel(NovelBase, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    created_on: datetime = Field(default_factory=datetime.now)
-    updated_on: datetime = Field(
-        default_factory=datetime.now,
-        sa_column_kwargs={"onupdate": lambda: datetime.now()}
-        )
+from app.types import Novel, NovelCreate, NovelPublic, NovelUpdate
 
-class NovelPublic(NovelBase):
-    id: int
-    updated_on: datetime
-
-class NovelCreate(NovelBase):
-    ...
-
-class NovelUpdate(NovelBase):
-    ...
 
 # ================================
 # CONSTANTS
