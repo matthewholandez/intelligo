@@ -36,9 +36,6 @@ class NovelCreate(NovelBase):
 class NovelUpdate(NovelBase):
     ...
 
-class NovelRequest(BaseModel):
-    name: str
-
 # ================================
 # CONSTANTS
 # ================================
