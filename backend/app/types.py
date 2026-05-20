@@ -34,12 +34,15 @@ class ChapterBase(SQLModel):
     number: int = Field(index=True)
     source_text: str
 
-class Chapter(ChapterBase):
+class Chapter(ChapterBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     novel_id: int = Field(foreign_key="novel.id", index=True)
     translated_text: str | None = None
     created_on: datetime = Field(default_factory=datetime.now)
-    updated_on: datetime = Field(default_factory=datetime.now, sa_column_kwargs={"onupdate": lambda: datetime.now})
+    updated_on: datetime = Field(
+        default_factory=datetime.now,
+        sa_column_kwargs={"onupdate": lambda: datetime.now()},
+    )
 
 class ChapterPublic(ChapterBase):
     id: int
@@ -47,6 +50,10 @@ class ChapterPublic(ChapterBase):
     translated_text: str | None
     updated_on: datetime
 
-class ChapterUpdate(SQLModel):
-    # Will also trigger a re-translation
+class ChapterCreate(ChapterBase):
     ...
+
+class ChapterUpdate(SQLModel):
+    number: int | None = None
+    source_text: str | None = None
+    translated_text: str | None = None
