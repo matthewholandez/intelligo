@@ -5,6 +5,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from sqlmodel import col, select
 
 from app.db import SessionDep
+from app.translation import translate_text, write_translation_file
 from app.types import Chapter, ChapterPublic, ChapterUpdate, Novel
 
 router = APIRouter()
@@ -60,10 +61,17 @@ async def create_chapter(
         assert source_text is not None
         text = source_text
 
-    chapter = Chapter(number=number, source_text=text, novel_id=novel_id)
+    translated = translate_text(text)
+    chapter = Chapter(
+        number=number,
+        source_text=text,
+        translated_text=translated,
+        novel_id=novel_id,
+    )
     session.add(chapter)
     session.commit()
     session.refresh(chapter)
+    write_translation_file(novel_id, chapter.number, translated)
     return chapter
 
 
