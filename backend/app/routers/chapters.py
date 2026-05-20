@@ -5,12 +5,12 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from sqlmodel import col, select
 
 from app.db import SessionDep
+from app.extraction import extract_text_from_html
 from app.translation import translate_text, write_translation_file
 from app.types import Chapter, ChapterPublic, ChapterUpdate, Novel
 
 router = APIRouter()
 
-SUPPORTED_EXTENSIONS = {".md", ".html"}
 MAX_BYTES = 5 * 1024 * 1024
 
 
@@ -29,7 +29,7 @@ async def create_chapter(
     file: UploadFile | None = File(default=None),
     source_text: Annotated[str | None, Form()] = None,
 ):
-    """Upload a chapter via file (.md/.html) or raw source_text."""
+    """Upload a chapter via .html file or raw source_text."""
     if not session.get(Novel, novel_id):
         raise HTTPException(status_code=404, detail="Novel not found")
 
@@ -45,18 +45,22 @@ async def create_chapter(
 
     if file is not None:
         suffix = Path(file.filename or "").suffix.lower()
-        if suffix not in SUPPORTED_EXTENSIONS:
+        if suffix != ".html":
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file extension; expected one of {sorted(SUPPORTED_EXTENSIONS)}",
+                detail="Unsupported file extension; expected .html",
             )
         raw_bytes = await file.read(MAX_BYTES + 1)
         if len(raw_bytes) > MAX_BYTES:
             raise HTTPException(status_code=413, detail="File too large (max 5 MB)")
         try:
-            text = raw_bytes.decode("utf-8")
+            html = raw_bytes.decode("utf-8")
         except UnicodeDecodeError:
             raise HTTPException(status_code=400, detail="File must be valid UTF-8")
+        try:
+            text = extract_text_from_html(html)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     else:
         assert source_text is not None
         text = source_text
