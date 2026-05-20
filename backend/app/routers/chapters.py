@@ -6,6 +6,7 @@ from sqlmodel import col, select
 
 from app.db import SessionDep
 from app.extraction import extract_text_from_html
+from app.glossary import format_for_prompt, load_glossary, merge_updates
 from app.translation import translate_text, write_translation_file
 from app.types import Chapter, ChapterPublic, ChapterUpdate, Novel
 
@@ -65,17 +66,21 @@ async def create_chapter(
         assert source_text is not None
         text = source_text
 
-    translated = translate_text(text)
+    existing_glossary = load_glossary(session, novel_id)
+    result = translate_text(text, glossary_lines=format_for_prompt(existing_glossary))
+
     chapter = Chapter(
         number=number,
         source_text=text,
-        translated_text=translated,
+        translated_text=result.translated_text,
         novel_id=novel_id,
     )
     session.add(chapter)
     session.commit()
     session.refresh(chapter)
-    write_translation_file(novel_id, chapter.number, translated)
+
+    merge_updates(session, novel_id, existing_glossary, result.glossary_updates)
+    write_translation_file(novel_id, chapter.number, result.translated_text)
     return chapter
 
 

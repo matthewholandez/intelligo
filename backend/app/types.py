@@ -1,5 +1,9 @@
-from sqlmodel import SQLModel, Field
 from datetime import datetime
+
+from pydantic import BaseModel
+from pydantic import Field as PydField
+from sqlalchemy import UniqueConstraint
+from sqlmodel import Field, SQLModel
 
 
 # ================================
@@ -57,3 +61,41 @@ class ChapterUpdate(SQLModel):
     number: int | None = None
     source_text: str | None = None
     translated_text: str | None = None
+
+
+# ================================
+# GLOSSARY
+# ================================
+class GlossaryEntryBase(SQLModel):
+    source_term: str = Field(index=True)
+    translation: str
+
+class GlossaryEntry(GlossaryEntryBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    novel_id: int = Field(foreign_key="novel.id", index=True)
+    created_on: datetime = Field(default_factory=datetime.now)
+    __table_args__ = (UniqueConstraint("novel_id", "source_term"),)
+
+class GlossaryEntryPublic(GlossaryEntryBase):
+    id: int
+    novel_id: int
+    created_on: datetime
+
+class GlossaryEntryCreate(GlossaryEntryBase):
+    ...
+
+class GlossaryEntryUpdate(SQLModel):
+    source_term: str | None = None
+    translation: str | None = None
+
+
+# ================================
+# LLM STRUCTURED OUTPUT
+# ================================
+class GlossaryUpdate(BaseModel):
+    source_term: str
+    preferred_translation: str
+
+class ChapterResponse(BaseModel):
+    translated_text: str
+    glossary_updates: list[GlossaryUpdate] = PydField(default_factory=list)
