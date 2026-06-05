@@ -220,4 +220,5 @@ __marimo__/
 .streamlit/secrets.toml
 
 novels.db
+backend/translations/
 .vscode
