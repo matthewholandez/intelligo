@@ -118,7 +118,10 @@ export function UploadChapterDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
-      <DialogContent className="shadow-overlay sm:max-w-lg" showCloseButton={!isPending}>
+      <DialogContent
+        className="shadow-overlay max-h-[85vh] overflow-y-auto sm:max-w-lg"
+        showCloseButton={!isPending}
+      >
         <DialogHeader>
           <DialogTitle>Upload chapter</DialogTitle>
           <DialogDescription>
@@ -215,7 +218,7 @@ export function UploadChapterDialog({
               value={sourceText}
               disabled={isPending}
               onChange={(e) => setSourceText(e.target.value)}
-              className="min-h-[160px] font-mono text-sm"
+              className="max-h-[45vh] min-h-[160px] font-mono text-sm"
             />
           )}
 
