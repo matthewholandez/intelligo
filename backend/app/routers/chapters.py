@@ -6,8 +6,13 @@ from sqlmodel import col, select
 
 from app.db import SessionDep
 from app.extraction import extract_text_from_html
-from app.glossary import format_for_prompt, load_glossary, merge_updates
-from app.translation import translate_text, write_translation_file
+from app.glossary import (
+    format_for_prompt,
+    load_glossary,
+    merge_updates,
+    scan_existing,
+)
+from app.translation import extract_terms, translate_text, write_translation_file
 from app.types import Chapter, ChapterPublic, ChapterUpdate, Novel
 
 router = APIRouter()
@@ -67,20 +72,32 @@ async def create_chapter(
         text = source_text
 
     existing_glossary = load_glossary(session, novel_id)
-    result = translate_text(text, glossary_lines=format_for_prompt(existing_glossary))
+
+    # Agent 1 — extract new key terms from this chapter (skipping known ones)
+    # and store them in the glossary with first-write-wins semantics.
+    new_terms = extract_terms(text, existing_terms=list(existing_glossary))
+    merge_updates(session, novel_id, existing_glossary, new_terms)
+
+    # Deterministically gather the glossary context for this chapter: existing
+    # terms that are mentioned, plus the freshly extracted ones (now merged in).
+    glossary_context = scan_existing(text, existing_glossary)
+
+    # Agent 2 — translate using the glossary as canonical context.
+    translated_text = translate_text(
+        text, glossary_lines=format_for_prompt(glossary_context)
+    )
 
     chapter = Chapter(
         number=number,
         source_text=text,
-        translated_text=result.translated_text,
+        translated_text=translated_text,
         novel_id=novel_id,
     )
     session.add(chapter)
     session.commit()
     session.refresh(chapter)
 
-    merge_updates(session, novel_id, existing_glossary, result.glossary_updates)
-    write_translation_file(novel_id, chapter.number, result.translated_text)
+    write_translation_file(novel_id, chapter.number, translated_text)
     return chapter
 
 

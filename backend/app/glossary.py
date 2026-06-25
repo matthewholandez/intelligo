@@ -10,6 +10,12 @@ def load_glossary(session: Session, novel_id: int) -> dict[str, str]:
     return {r.source_term: r.translation for r in rows}
 
 
+def scan_existing(source: str, glossary: dict[str, str]) -> dict[str, str]:
+    """Deterministically find which glossary terms are mentioned in the source."""
+    lowered = source.lower()
+    return {src: tgt for src, tgt in glossary.items() if src.lower() in lowered}
+
+
 def format_for_prompt(glossary: dict[str, str]) -> str | None:
     if not glossary:
         return None

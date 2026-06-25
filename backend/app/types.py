@@ -96,6 +96,10 @@ class GlossaryUpdate(BaseModel):
     source_term: str
     preferred_translation: str
 
-class ChapterResponse(BaseModel):
+class GlossaryExtraction(BaseModel):
+    """Structured output of the term-extraction agent."""
+    terms: list[GlossaryUpdate] = PydField(default_factory=list)
+
+class TranslatedChapter(BaseModel):
+    """Structured output of the translation agent."""
     translated_text: str
-    glossary_updates: list[GlossaryUpdate] = PydField(default_factory=list)
