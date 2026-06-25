@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 
 from app.db import SessionDep
@@ -21,6 +22,17 @@ def _get_chapter_or_404(session, novel_id: int, chap_id: int) -> Chapter:
     return chapter
 
 
+def _duplicate_number_exists(
+    session, novel_id: int, number: int, *, exclude_id: int | None = None
+) -> bool:
+    stmt = select(Chapter.id).where(
+        Chapter.novel_id == novel_id, Chapter.number == number
+    )
+    if exclude_id is not None:
+        stmt = stmt.where(Chapter.id != exclude_id)
+    return session.exec(stmt).first() is not None
+
+
 @router.post("/novels/{novel_id}/chapters", response_model=ChapterPublic)
 async def create_chapter(
     novel_id: int,
@@ -38,6 +50,12 @@ async def create_chapter(
     """
     if not session.get(Novel, novel_id):
         raise HTTPException(status_code=404, detail="Novel not found")
+
+    if _duplicate_number_exists(session, novel_id, number):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Chapter {number} already exists in this novel",
+        )
 
     if file is not None and source_text is not None:
         raise HTTPException(
@@ -79,7 +97,14 @@ async def create_chapter(
         novel_id=novel_id,
     )
     session.add(chapter)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Chapter {number} already exists in this novel",
+        )
     session.refresh(chapter)
 
     # Run the LLM pipeline off the request cycle.
@@ -141,9 +166,30 @@ def update_chapter(
 ):
     """Update a chapter."""
     chapter_db = _get_chapter_or_404(session, novel_id, chap_id)
-    chapter_db.sqlmodel_update(chapter.model_dump(exclude_unset=True))
+    updates = chapter.model_dump(exclude_unset=True)
+
+    if (
+        "number" in updates
+        and updates["number"] != chapter_db.number
+        and _duplicate_number_exists(
+            session, novel_id, updates["number"], exclude_id=chap_id
+        )
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Chapter {updates['number']} already exists in this novel",
+        )
+
+    chapter_db.sqlmodel_update(updates)
     session.add(chapter_db)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Chapter number already exists in this novel",
+        )
     session.refresh(chapter_db)
     return chapter_db
 

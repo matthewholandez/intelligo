@@ -50,6 +50,7 @@ class ChapterBase(SQLModel):
     source_text: str
 
 class Chapter(ChapterBase, table=True):
+    __table_args__ = (UniqueConstraint("novel_id", "number"),)
     id: int | None = Field(default=None, primary_key=True)
     novel_id: int = Field(foreign_key="novel.id", index=True)
     translated_text: str | None = None
