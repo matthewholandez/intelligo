@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ChevronRight, Trash2 } from "lucide-react";
+import { ChevronRight, Loader2, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -14,6 +14,31 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useChapters, useDeleteChapter } from "@/lib/hooks";
 import { formatRelativeTime } from "@/lib/utils";
 import type { Chapter } from "@/types";
+
+const IN_PROGRESS_LABEL: Record<string, string> = {
+  pending: "Queued…",
+  analyzing: "Finding terms…",
+  translating: "Translating…",
+};
+
+function ChapterStatusIndicator({ chapter }: { chapter: Chapter }) {
+  if (chapter.status in IN_PROGRESS_LABEL) {
+    return (
+      <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+        <Loader2 className="size-3.5 animate-spin" />
+        {IN_PROGRESS_LABEL[chapter.status]}
+      </span>
+    );
+  }
+  if (chapter.status === "failed") {
+    return (
+      <Badge variant="secondary" className="border-destructive/30 font-normal text-destructive">
+        Failed
+      </Badge>
+    );
+  }
+  return <span className="text-[13px] text-muted-foreground">Translated</span>;
+}
 
 function ChapterRowSkeleton() {
   return (
@@ -75,13 +100,7 @@ export default function ChaptersTab({ novelId }: { novelId: number }) {
                 className="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
               >
                 <span className="font-medium">Ch. {chapter.number}</span>
-                {chapter.translated_text != null ? (
-                  <span className="text-[13px] text-muted-foreground">Translated</span>
-                ) : (
-                  <Badge variant="secondary" className="font-normal">
-                    Not translated
-                  </Badge>
-                )}
+                <ChapterStatusIndicator chapter={chapter} />
                 <span className="ml-auto text-[13px] font-medium text-muted-foreground">
                   {formatRelativeTime(chapter.updated_on)}
                 </span>

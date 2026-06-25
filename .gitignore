@@ -6,6 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# .env
+.env.local
+.env
+.env.dev
+
 # Distribution / packaging
 .Python
 build/
@@ -16,6 +21,8 @@ eggs/
 .eggs/
 lib/
 lib64/
+# ...but the frontend's source lives in src/lib and must stay tracked
+!frontend/src/lib/
 parts/
 sdist/
 var/

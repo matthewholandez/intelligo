@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Loader2,
   Pencil,
+  RefreshCw,
   Save,
   X,
 } from "lucide-react";
@@ -22,12 +24,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+  isChapterInProgress,
   useChapter,
   useChapters,
   useGlossary,
+  useRetranslateChapter,
   useUpdateChapter,
 } from "@/lib/hooks";
 import { cn, isAxiosErrorWithStatus } from "@/lib/utils";
+import type { ChapterStatus } from "@/types";
+
+const STAGE_LABEL: Record<string, string> = {
+  pending: "Queued for translation",
+  analyzing: "Finding glossary terms…",
+  translating: "Translating…",
+};
 
 type ViewMode = "translation" | "side-by-side";
 
@@ -44,9 +55,11 @@ export default function ChapterReaderPage() {
   const { data: chapters } = useChapters(novelId);
   const { data: glossary } = useGlossary(novelId);
   const updateMutation = useUpdateChapter(novelId, chapId);
+  const retranslateMutation = useRetranslateChapter(novelId, chapId);
 
   const readingSize = useReadingSize();
   const [viewMode, setViewMode] = useState<ViewMode>("translation");
+  const [retranslateOpen, setRetranslateOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editBuffer, setEditBuffer] = useState("");
   const [savedText, setSavedText] = useState("");
@@ -62,6 +75,26 @@ export default function ChapterReaderPage() {
       }
     }
   }, [chapter, isEditing]);
+
+  // Announce the moment a background translation finishes.
+  const prevStatusRef = useRef<ChapterStatus | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    const status = chapter?.status;
+    if (prev && isChapterInProgress(prev) && status === "completed") {
+      const n = chapter?.new_terms_count ?? 0;
+      toast.success(
+        n > 0
+          ? `Translation complete — ${n} new term${
+              n === 1 ? "" : "s"
+            } added to the glossary`
+          : "Translation complete"
+      );
+    } else if (prev && isChapterInProgress(prev) && status === "failed") {
+      toast.error("Translation failed");
+    }
+    prevStatusRef.current = status;
+  }, [chapter?.status, chapter?.new_terms_count]);
 
   const sortedChapters = useMemo(
     () => [...(chapters ?? [])].sort((a, b) => a.number - b.number),
@@ -137,6 +170,16 @@ export default function ChapterReaderPage() {
     }
   };
 
+  const handleRetranslate = async () => {
+    setRetranslateOpen(false);
+    try {
+      await retranslateMutation.mutateAsync();
+      toast.success("Re-translating…");
+    } catch {
+      // toast handled in hook
+    }
+  };
+
   if (isLoading) {
     return (
       <ReaderShell novelId={novelId} chapterNumber={null}>
@@ -187,6 +230,26 @@ export default function ChapterReaderPage() {
         </Button>
       </div>
     </div>
+  ) : isChapterInProgress(chapter.status) ? (
+    <StagePanel status={chapter.status} />
+  ) : chapter.status === "failed" ? (
+    <div className="rounded-lg border border-destructive/30 bg-surface-muted px-4 py-6">
+      <p className="font-medium text-destructive">Translation failed</p>
+      {chapter.error ? (
+        <p className="mt-1 break-words text-sm text-muted-foreground">
+          {chapter.error}
+        </p>
+      ) : null}
+      <Button
+        size="sm"
+        className="mt-4"
+        disabled={retranslateMutation.isPending}
+        onClick={() => retranslateMutation.mutate()}
+      >
+        <RefreshCw className="size-3.5" />
+        Re-translate
+      </Button>
+    </div>
   ) : chapter.translated_text != null ? (
     <MarkdownView content={chapter.translated_text} glossary={glossary ?? []} />
   ) : (
@@ -231,7 +294,20 @@ export default function ChapterReaderPage() {
             </ToggleGroupItem>
           </ToggleGroup>
           <ReaderSettings />
-          {!isEditing ? (
+          {!isEditing && !isChapterInProgress(chapter.status) ? (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Re-translate chapter"
+              disabled={retranslateMutation.isPending}
+              onClick={() => setRetranslateOpen(true)}
+            >
+              <RefreshCw className="size-4" />
+            </Button>
+          ) : null}
+          {!isEditing &&
+          chapter.translated_text != null &&
+          !isChapterInProgress(chapter.status) ? (
             <Button variant="outline" size="sm" onClick={startEditing}>
               <Pencil className="size-3.5" />
               Edit
@@ -305,7 +381,29 @@ export default function ChapterReaderPage() {
         destructive
         onConfirm={confirmDiscard}
       />
+
+      <ConfirmDialog
+        open={retranslateOpen}
+        onOpenChange={setRetranslateOpen}
+        title="Re-translate chapter?"
+        description="This replaces the current translation using the current glossary. Any manual edits to this chapter will be lost."
+        confirmLabel="Re-translate"
+        isPending={retranslateMutation.isPending}
+        onConfirm={handleRetranslate}
+      />
     </>
+  );
+}
+
+function StagePanel({ status }: { status: ChapterStatus }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-border bg-surface-muted px-4 py-16 text-center">
+      <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      <p className="font-medium">{STAGE_LABEL[status] ?? "Working…"}</p>
+      <p className="max-w-xs text-sm text-muted-foreground">
+        This runs in the background — you can leave this page and come back.
+      </p>
+    </div>
   );
 }
 

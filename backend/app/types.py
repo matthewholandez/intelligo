@@ -1,9 +1,20 @@
 from datetime import datetime
+from enum import Enum
 
 from pydantic import BaseModel
 from pydantic import Field as PydField
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
+
+
+class ChapterStatus(str, Enum):
+    """Lifecycle of a chapter's background translation pipeline."""
+
+    pending = "pending"
+    analyzing = "analyzing"
+    translating = "translating"
+    completed = "completed"
+    failed = "failed"
 
 
 # ================================
@@ -42,6 +53,9 @@ class Chapter(ChapterBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     novel_id: int = Field(foreign_key="novel.id", index=True)
     translated_text: str | None = None
+    status: ChapterStatus = Field(default=ChapterStatus.pending, index=True)
+    error: str | None = None
+    new_terms_count: int | None = None
     created_on: datetime = Field(default_factory=datetime.now)
     updated_on: datetime = Field(
         default_factory=datetime.now,
@@ -52,6 +66,9 @@ class ChapterPublic(ChapterBase):
     id: int
     novel_id: int
     translated_text: str | None
+    status: ChapterStatus
+    error: str | None
+    new_terms_count: int | None
     updated_on: datetime
 
 class ChapterCreate(ChapterBase):
