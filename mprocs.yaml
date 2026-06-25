@@ -1,0 +1,7 @@
+procs:
+  backend:
+    shell: uv run fastapi dev
+    cwd: ./backend
+  frontend:
+    shell: npm run dev
+    cwd: ./frontend
