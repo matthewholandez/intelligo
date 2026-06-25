@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ErrorState } from "@/components/ErrorState";
 import { MarkdownView } from "@/components/MarkdownView";
+import { ReaderSettings, readingSizeStyle } from "@/components/ReaderSettings";
+import { useReadingSize } from "@/lib/reader-prefs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +45,7 @@ export default function ChapterReaderPage() {
   const { data: glossary } = useGlossary(novelId);
   const updateMutation = useUpdateChapter(novelId, chapId);
 
+  const readingSize = useReadingSize();
   const [viewMode, setViewMode] = useState<ViewMode>("translation");
   const [isEditing, setIsEditing] = useState(false);
   const [editBuffer, setEditBuffer] = useState("");
@@ -227,6 +230,7 @@ export default function ChapterReaderPage() {
               Side-by-side
             </ToggleGroupItem>
           </ToggleGroup>
+          <ReaderSettings />
           {!isEditing ? (
             <Button variant="outline" size="sm" onClick={startEditing}>
               <Pencil className="size-3.5" />
@@ -261,23 +265,29 @@ export default function ChapterReaderPage() {
       </div>
 
       {viewMode === "translation" ? (
-        <div className="mx-auto w-full max-w-[680px] px-4 py-8 sm:px-6">
+        <div
+          className="mx-auto w-full max-w-[680px] px-4 py-8 sm:px-6"
+          style={readingSizeStyle(readingSize)}
+        >
           {translationPanel}
         </div>
       ) : (
-        <div className="mx-auto w-full max-w-[1100px] px-4 py-8 sm:px-6">
+        <div
+          className="mx-auto w-full max-w-[1100px] px-4 py-8 sm:px-6"
+          style={readingSizeStyle(readingSize)}
+        >
           <div className="flex flex-col gap-8 min-[900px]:flex-row min-[900px]:gap-8">
             <section className="min-h-[40vh] flex-1 min-[900px]:overflow-y-auto">
-              <h2 className="mb-3 text-[13px] font-medium text-muted-foreground">
-                Source
+              <h2 className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                原文 · Source
               </h2>
-              <pre className="whitespace-pre-wrap rounded-lg bg-surface-muted p-4 font-mono text-sm leading-relaxed text-foreground">
+              <div className="source-prose rounded-lg bg-surface-muted p-4 text-foreground">
                 {chapter.source_text}
-              </pre>
+              </div>
             </section>
             <div className="hidden w-px shrink-0 bg-border min-[900px]:block" />
             <section className="min-h-[40vh] flex-1 min-[900px]:overflow-y-auto">
-              <h2 className="mb-3 text-[13px] font-medium text-muted-foreground">
+              <h2 className="mb-3 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 Translation
               </h2>
               {translationPanel}
