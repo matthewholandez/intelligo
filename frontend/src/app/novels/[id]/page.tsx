@@ -107,7 +107,7 @@ export default function NovelDashboardPage() {
 
       <div className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-[28px] font-semibold leading-tight">{novel.name}</h1>
+          <h1 className="font-heading text-[28px] font-semibold leading-tight">{novel.name}</h1>
         </div>
         <Button
           variant="outline"

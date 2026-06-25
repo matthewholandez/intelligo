@@ -16,11 +16,15 @@ finished translations are also written to disk as Markdown.
 
 ```bash
 uv sync
-export OPENROUTER_API_KEY=...    # required for translation
-uv run fastapi dev               # http://127.0.0.1:8000  (docs at /docs)
+echo "OPENROUTER_API_KEY=..." >> ../.env.local    # required for translation
+uv run fastapi dev                                 # http://127.0.0.1:8000  (docs at /docs)
 ```
 
 ### Environment variables
+
+On startup the backend loads `.env.local` from the **repo root** (one level above
+`backend/`); variables already set in your shell take precedence. The file is
+gitignored — never commit your key.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
@@ -33,25 +37,35 @@ The translation model is configured in `app/translation.py` (`MODEL`, currently
 
 ## How translation works
 
-When a chapter is uploaded (`POST /novels/{novel_id}/chapters`), two LLM agents
-run in sequence:
+When a chapter is uploaded (`POST /novels/{novel_id}/chapters`), text is
+extracted and the chapter is saved immediately with `status="pending"`; the
+upload **returns right away**. The two LLM agents then run in a background task
+(`app/pipeline.py`), driving the chapter's `status` through `analyzing` →
+`translating` → `completed` (or `failed`). Poll the chapter to follow along.
 
-1. **Extract** — if an `.html` file is provided, readable text is extracted with
-   trafilatura; if `source_text` is provided instead, it is used as-is.
-2. **Term-extraction agent** — reads the chapter and returns new glossary terms
-   (proper nouns, character names, factions, titles, skills, realms, key items)
-   as structured output (`GlossaryExtraction`). The novel's existing terms are
-   passed in so they aren't re-proposed. New terms are merged into the glossary
-   with **first-write-wins** semantics (existing entries are never overwritten).
+1. **Extract** (synchronous, in the request) — if an `.html` file is provided,
+   readable text is extracted with trafilatura; if `source_text` is provided
+   instead, it is used as-is. Bad input is rejected here (`400`/`413`).
+2. **Term-extraction agent** (`status="analyzing"`) — reads the chapter and
+   returns new glossary terms (proper nouns, character names, factions, titles,
+   skills, realms, key items) as structured output (`GlossaryExtraction`). The
+   novel's existing terms are passed in so they aren't re-proposed. New terms are
+   merged with **first-write-wins** semantics (existing entries are never
+   overwritten); the count is recorded on `Chapter.new_terms_count`.
 3. **Build context** — the chapter is scanned **deterministically** for the
    glossary terms it mentions (`scan_existing`); those — including the terms just
    added — become the translation context.
-4. **Translation agent** — translates the chapter using that glossary context so
-   canonical translations are reused verbatim, returning `TranslatedChapter`.
-5. **Persist** — the chapter is saved to the database and the translation is
-   written to `translations/<novel_id>/chapter-NNNN.md`.
+4. **Translation agent** (`status="translating"`) — translates the chapter using
+   that glossary context so canonical translations are reused verbatim, returning
+   `TranslatedChapter`.
+5. **Persist** (`status="completed"`) — the chapter is saved and the translation
+   is written to `translations/<novel_id>/chapter-NNNN.md`. Any failure sets
+   `status="failed"` with the message in `Chapter.error`.
 
-The whole pipeline runs **synchronously** within the upload request.
+`POST /novels/{novel_id}/chapters/{chap_id}/retranslate` re-runs this pipeline on
+the existing source text against the current glossary (`409` if a translation is
+already in progress). A server restart marks any in-progress chapter `failed`
+("Interrupted by server restart") so it can be re-translated.
 
 ## Project layout
 
@@ -89,9 +103,10 @@ Interactive docs at `/docs` when the server is running.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/novels/{novel_id}/chapters` | Upload & translate a chapter (see below) |
+| `POST` | `/novels/{novel_id}/chapters` | Upload a chapter; translation runs in the background (see below) |
 | `GET` | `/novels/{novel_id}/chapters` | List chapters ordered by `number` — `404` if novel missing |
-| `GET` | `/novels/{novel_id}/chapters/{chap_id}` | Get a chapter — `404` if missing |
+| `GET` | `/novels/{novel_id}/chapters/{chap_id}` | Get a chapter (poll for `status`) — `404` if missing |
+| `POST` | `/novels/{novel_id}/chapters/{chap_id}/retranslate` | Re-run the pipeline on the existing source — `404` if missing, `409` if already in progress |
 | `PATCH` | `/novels/{novel_id}/chapters/{chap_id}` | Update a chapter (partial) — `404` if missing |
 | `DELETE` | `/novels/{novel_id}/chapters/{chap_id}` | Delete a chapter — `404` if missing |
 
@@ -102,7 +117,8 @@ Interactive docs at `/docs` when the server is running.
 - `source_text` (str, optional) — used verbatim
 
 Provide **exactly one** of `file` or `source_text`. Responses: `200`
-`ChapterPublic`; `400` bad input; `404` novel missing; `413` file over 5 MB.
+`ChapterPublic` with `status="pending"` (translation continues in the
+background); `400` bad input; `404` novel missing; `413` file over 5 MB.
 
 ### Glossary
 
@@ -121,7 +137,9 @@ Glossary entries are unique per `(novel_id, source_term)`.
 `NovelPublic` — `id` (int), `name` (str), `updated_on` (datetime)
 
 `ChapterPublic` — `id` (int), `novel_id` (int), `number` (int),
-`source_text` (str), `translated_text` (str | null), `updated_on` (datetime)
+`source_text` (str), `translated_text` (str | null), `status`
+(`pending`/`analyzing`/`translating`/`completed`/`failed`), `error` (str | null),
+`new_terms_count` (int | null), `updated_on` (datetime)
 
 `GlossaryEntryPublic` — `id` (int), `novel_id` (int), `source_term` (str),
 `translation` (str), `created_on` (datetime)

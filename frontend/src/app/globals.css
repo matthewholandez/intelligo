@@ -2,6 +2,9 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* next-themes toggles a class on <html>; make `dark:` utilities respond to it. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -12,6 +15,7 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
+  --color-seal: var(--seal);
   --color-destructive: var(--destructive);
   --color-ring: var(--ring);
   --color-popover: var(--popover);
@@ -20,34 +24,90 @@
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-input: var(--input);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist-sans);
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 8px;
+
+  --font-sans: var(--font-ui-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-reading: var(--font-reading-serif), Georgia, "Times New Roman", serif;
+  --font-heading: var(--font-reading-serif), Georgia, serif;
+  --font-source: var(--font-reading-serif), "Songti SC", "Hiragino Mincho ProN",
+    "Yu Mincho", "Noto Serif CJK SC", "Noto Serif SC", "Source Han Serif SC",
+    serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 9px;
 }
 
+/* ── Light: xuan paper + sumi ink ───────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --surface: #ffffff;
-  --surface-muted: #f4f4f5;
-  --foreground: #0a0a0a;
-  --muted-foreground: #71717a;
-  --border: #e4e4e7;
-  --primary: #18181b;
-  --primary-foreground: #fafafa;
-  --accent: #1e293b;
-  --destructive: #b91c1c;
-  --ring: #1e293b;
-  --popover: #ffffff;
-  --popover-foreground: #0a0a0a;
-  --muted: #f4f4f5;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #0a0a0a;
-  --input: #e4e4e7;
-  --radius: 8px;
-  --shadow-overlay: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.08);
+  --background: #f3f1ec;
+  --surface: #fbf9f4;
+  --surface-muted: #ebe7dd;
+  --foreground: #1c1a17;
+  --muted-foreground: #6b675e;
+  --border: #ded9ce;
+  --primary: #1c1a17;
+  --primary-foreground: #f5f2ea;
+  --accent: #3e6b5a; /* jade */
+  --seal: #b4452f; /* cinnabar — reserved for the glossary seal mark */
+  --destructive: #b3402c;
+  --ring: #3e6b5a;
+  --popover: #fbf9f4;
+  --popover-foreground: #1c1a17;
+  --muted: #ebe7dd;
+  --secondary: #ebe7dd;
+  --secondary-foreground: #1c1a17;
+  --input: #ded9ce;
+  --radius: 9px;
+  --shadow-overlay: 0 1px 2px rgba(28, 26, 23, 0.05),
+    0 10px 30px rgba(28, 26, 23, 0.1);
+}
+
+/* ── Sepia: warmer reading surface ──────────────────────────────── */
+.sepia {
+  --background: #e9dfcb;
+  --surface: #f0e8d6;
+  --surface-muted: #ded2b8;
+  --foreground: #3b2f22;
+  --muted-foreground: #7c6f58;
+  --border: #cfc2a6;
+  --primary: #3b2f22;
+  --primary-foreground: #f0e8d6;
+  --accent: #5a6f52;
+  --seal: #a8432b;
+  --destructive: #9e3b2a;
+  --ring: #5a6f52;
+  --popover: #f0e8d6;
+  --popover-foreground: #3b2f22;
+  --muted: #ded2b8;
+  --secondary: #ded2b8;
+  --secondary-foreground: #3b2f22;
+  --input: #cfc2a6;
+  --shadow-overlay: 0 1px 2px rgba(59, 47, 34, 0.06),
+    0 10px 30px rgba(59, 47, 34, 0.12);
+}
+
+/* ── Dark: ink ──────────────────────────────────────────────────── */
+.dark {
+  --background: #16140f;
+  --surface: #201d17;
+  --surface-muted: #2a261e;
+  --foreground: #ece6d8;
+  --muted-foreground: #9c9484;
+  --border: #332f26;
+  --primary: #ece6d8;
+  --primary-foreground: #16140f;
+  --accent: #7fa890; /* jade, lifted for dark */
+  --seal: #d4664b; /* cinnabar, lifted for dark */
+  --destructive: #e5705c;
+  --ring: #7fa890;
+  --popover: #201d17;
+  --popover-foreground: #ece6d8;
+  --muted: #2a261e;
+  --secondary: #2a261e;
+  --secondary-foreground: #ece6d8;
+  --input: #332f26;
+  --shadow-overlay: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 @layer base {
@@ -66,12 +126,17 @@
   .shadow-overlay {
     box-shadow: var(--shadow-overlay);
   }
+  .font-source {
+    font-family: var(--font-source);
+  }
 }
 
-/* Reader typography */
+/* ── Reader typography ──────────────────────────────────────────── */
 .reader-prose {
-  font-size: 18px;
-  line-height: 1.7;
+  font-family: var(--font-reading);
+  font-size: var(--reading-size, 19px);
+  line-height: 1.75;
+  letter-spacing: 0.003em;
 }
 
 .reader-prose p + p {
@@ -82,6 +147,7 @@
 .reader-prose h2,
 .reader-prose h3,
 .reader-prose h4 {
+  font-family: var(--font-heading);
   font-weight: 600;
   line-height: 1.3;
   margin-top: 1.5em;
@@ -115,18 +181,39 @@
   padding-left: 1em;
   color: var(--muted-foreground);
   margin: 1em 0;
+  font-style: italic;
+}
+
+/* Scene break: the markdown `* * *` becomes an <hr>. Render it as a
+   breathing, centered asterism rather than a cramped full-width hairline. */
+.reader-prose hr {
+  border: 0;
+  height: 0;
+  margin: 2.5em 0;
+  overflow: visible;
+  text-align: center;
+}
+
+.reader-prose hr::before {
+  content: "· · ·";
+  display: inline-block;
+  color: var(--muted-foreground);
+  font-size: 1.2em;
+  letter-spacing: 0.4em;
+  /* the letter-spacing adds trailing space; nudge back to stay centered */
+  text-indent: 0.4em;
 }
 
 .reader-prose code {
-  font-family: var(--font-geist-mono);
+  font-family: var(--font-mono);
   font-size: 0.9em;
   background: var(--surface-muted);
   padding: 0.15em 0.35em;
-  border-radius: 6px;
+  border-radius: 5px;
 }
 
 .reader-prose pre {
-  font-family: var(--font-geist-mono);
+  font-family: var(--font-mono);
   font-size: 0.85em;
   background: var(--surface-muted);
   padding: 1em;
@@ -140,14 +227,27 @@
   padding: 0;
 }
 
+/* Source-text panel: CJK gets a proper Mincho/Song serif, not monospace. */
+.source-prose {
+  font-family: var(--font-source);
+  font-size: var(--reading-size, 18px);
+  line-height: 1.85;
+  white-space: pre-wrap;
+}
+
+/* ── Signature: the glossary as a translator's seal ─────────────── */
+/* Inline, the term is a whisper — a thin cinnabar baseline. The seal
+   itself only appears in the popover. */
 .glossary-highlight {
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-decoration-color: var(--muted-foreground);
-  text-underline-offset: 3px;
+  text-decoration: none;
+  color: inherit;
+  border-bottom: 1px solid color-mix(in oklab, var(--seal) 42%, transparent);
+  padding-bottom: 0.5px;
   cursor: help;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .glossary-highlight:hover {
-  text-decoration-color: var(--accent);
+  background: color-mix(in oklab, var(--seal) 12%, transparent);
+  border-bottom-color: var(--seal);
 }

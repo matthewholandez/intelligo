@@ -12,12 +12,22 @@ export interface NovelUpdate {
   name?: string;
 }
 
+export type ChapterStatus =
+  | "pending"
+  | "analyzing"
+  | "translating"
+  | "completed"
+  | "failed";
+
 export interface Chapter {
   id: number;
   novel_id: number;
   number: number;
   source_text: string;
   translated_text: string | null;
+  status: ChapterStatus;
+  error: string | null;
+  new_terms_count: number | null;
   updated_on: string;
 }
 

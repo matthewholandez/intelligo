@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 type AppShellProps = {
@@ -32,11 +33,14 @@ export function AppShell({
           >
             <Link
               href="/"
-              className="text-base font-semibold text-foreground transition-colors duration-150 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="font-heading text-lg font-semibold tracking-tight text-foreground transition-colors duration-150 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Intelligo
             </Link>
-            {headerRight ? <div className="flex items-center gap-2">{headerRight}</div> : null}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              {headerRight}
+            </div>
           </div>
         </header>
       )}

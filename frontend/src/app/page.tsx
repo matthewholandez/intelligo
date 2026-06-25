@@ -26,6 +26,7 @@ import {
   useNovels,
   useUpdateNovel,
 } from "@/lib/hooks";
+import { formatRelativeTime } from "@/lib/utils";
 import type { Novel } from "@/types";
 
 function NovelCardSkeleton() {
@@ -47,12 +48,17 @@ function NovelCard({
   onDelete: (novel: Novel) => void;
 }) {
   return (
-    <div className="group relative rounded-lg border border-border bg-surface transition-colors duration-150 hover:border-accent/30">
+    <div className="group relative rounded-lg border border-border bg-surface transition-all duration-150 hover:border-accent/40 hover:shadow-overlay">
       <Link
         href={`/novels/${novel.id}`}
         className="block p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
       >
-        <h2 className="text-base font-semibold text-foreground">{novel.name}</h2>
+        <h2 className="font-heading text-lg font-semibold leading-snug text-foreground">
+          {novel.name}
+        </h2>
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          Updated {formatRelativeTime(novel.updated_on)}
+        </p>
       </Link>
       <div className="absolute right-3 top-3 flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
         <Button
@@ -135,9 +141,11 @@ export default function LibraryPage() {
       }
     >
       <div className="mb-8">
-        <h1 className="text-[28px] font-semibold leading-tight">Novel library</h1>
+        <h1 className="font-heading text-[28px] font-semibold leading-tight">
+          Library
+        </h1>
         <p className="mt-1 text-[13px] font-medium text-muted-foreground">
-          Manage your translated novels
+          Your novels, each with its own glossary of names and terms.
         </p>
       </div>
 

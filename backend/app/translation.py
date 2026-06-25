@@ -6,7 +6,8 @@ from langchain_openrouter import ChatOpenRouter
 from app.types import GlossaryExtraction, GlossaryUpdate, TranslatedChapter
 
 TRANSLATIONS_DIR = Path(__file__).resolve().parent.parent / "translations"
-MODEL = "google/gemini-2.5-flash"
+GLOSSARY_MODEL = "google/gemini-2.5-flash"
+TRANSLATION_MODEL = "google/gemini-3.5-flash"
 
 EXTRACTION_SYSTEM_PROMPT = (
     "You are a glossary builder for a literary translation pipeline. Read the "
@@ -48,7 +49,7 @@ def _build_translation_prompt(glossary_lines: str | None) -> str:
 
 def extract_terms(source: str, existing_terms: list[str]) -> list[GlossaryUpdate]:
     """Agent 1: extract new glossary terms from a chapter, skipping known ones."""
-    llm = ChatOpenRouter(model=MODEL).with_structured_output(GlossaryExtraction)
+    llm = ChatOpenRouter(model=GLOSSARY_MODEL).with_structured_output(GlossaryExtraction)
     result = llm.invoke(
         [
             SystemMessage(content=_build_extraction_prompt(existing_terms)),
@@ -61,7 +62,7 @@ def extract_terms(source: str, existing_terms: list[str]) -> list[GlossaryUpdate
 
 def translate_text(source: str, glossary_lines: str | None = None) -> str:
     """Agent 2: translate a chapter, using the glossary as canonical context."""
-    llm = ChatOpenRouter(model=MODEL).with_structured_output(TranslatedChapter)
+    llm = ChatOpenRouter(model=TRANSLATION_MODEL).with_structured_output(TranslatedChapter)
     result = llm.invoke(
         [
             SystemMessage(content=_build_translation_prompt(glossary_lines)),

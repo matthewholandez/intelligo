@@ -1,19 +1,14 @@
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 
 from app.db import SessionDep
 from app.extraction import extract_text_from_html
-from app.glossary import (
-    format_for_prompt,
-    load_glossary,
-    merge_updates,
-    scan_existing,
-)
-from app.translation import extract_terms, translate_text, write_translation_file
-from app.types import Chapter, ChapterPublic, ChapterUpdate, Novel
+from app.pipeline import run_translation_pipeline
+from app.types import Chapter, ChapterPublic, ChapterStatus, ChapterUpdate, Novel
 
 router = APIRouter()
 
@@ -27,17 +22,40 @@ def _get_chapter_or_404(session, novel_id: int, chap_id: int) -> Chapter:
     return chapter
 
 
+def _duplicate_number_exists(
+    session, novel_id: int, number: int, *, exclude_id: int | None = None
+) -> bool:
+    stmt = select(Chapter.id).where(
+        Chapter.novel_id == novel_id, Chapter.number == number
+    )
+    if exclude_id is not None:
+        stmt = stmt.where(Chapter.id != exclude_id)
+    return session.exec(stmt).first() is not None
+
+
 @router.post("/novels/{novel_id}/chapters", response_model=ChapterPublic)
 async def create_chapter(
     novel_id: int,
     session: SessionDep,
+    background_tasks: BackgroundTasks,
     number: Annotated[int, Form()],
     file: UploadFile | None = File(default=None),
     source_text: Annotated[str | None, Form()] = None,
 ):
-    """Upload a chapter via .html file or raw source_text."""
+    """Upload a chapter via .html file or raw source_text.
+
+    Returns immediately with the chapter in ``pending`` status; the term
+    extraction + translation pipeline runs in the background (poll the chapter
+    to watch ``status`` progress to ``completed`` or ``failed``).
+    """
     if not session.get(Novel, novel_id):
         raise HTTPException(status_code=404, detail="Novel not found")
+
+    if _duplicate_number_exists(session, novel_id, number):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Chapter {number} already exists in this novel",
+        )
 
     if file is not None and source_text is not None:
         raise HTTPException(
@@ -71,33 +89,26 @@ async def create_chapter(
         assert source_text is not None
         text = source_text
 
-    existing_glossary = load_glossary(session, novel_id)
-
-    # Agent 1 — extract new key terms from this chapter (skipping known ones)
-    # and store them in the glossary with first-write-wins semantics.
-    new_terms = extract_terms(text, existing_terms=list(existing_glossary))
-    merge_updates(session, novel_id, existing_glossary, new_terms)
-
-    # Deterministically gather the glossary context for this chapter: existing
-    # terms that are mentioned, plus the freshly extracted ones (now merged in).
-    glossary_context = scan_existing(text, existing_glossary)
-
-    # Agent 2 — translate using the glossary as canonical context.
-    translated_text = translate_text(
-        text, glossary_lines=format_for_prompt(glossary_context)
-    )
-
     chapter = Chapter(
         number=number,
         source_text=text,
-        translated_text=translated_text,
+        translated_text=None,
+        status=ChapterStatus.pending,
         novel_id=novel_id,
     )
     session.add(chapter)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Chapter {number} already exists in this novel",
+        )
     session.refresh(chapter)
 
-    write_translation_file(novel_id, chapter.number, translated_text)
+    # Run the LLM pipeline off the request cycle.
+    background_tasks.add_task(run_translation_pipeline, chapter.id, novel_id)
     return chapter
 
 
@@ -119,6 +130,33 @@ def get_chapter(novel_id: int, chap_id: int, session: SessionDep):
     return _get_chapter_or_404(session, novel_id, chap_id)
 
 
+@router.post(
+    "/novels/{novel_id}/chapters/{chap_id}/retranslate",
+    response_model=ChapterPublic,
+)
+def retranslate_chapter(
+    novel_id: int,
+    chap_id: int,
+    session: SessionDep,
+    background_tasks: BackgroundTasks,
+):
+    """Re-run the pipeline on the existing source text against the current glossary."""
+    chapter = _get_chapter_or_404(session, novel_id, chap_id)
+    if chapter.status in (ChapterStatus.analyzing, ChapterStatus.translating):
+        raise HTTPException(
+            status_code=409, detail="Translation already in progress"
+        )
+
+    chapter.status = ChapterStatus.pending
+    chapter.error = None
+    session.add(chapter)
+    session.commit()
+    session.refresh(chapter)
+
+    background_tasks.add_task(run_translation_pipeline, chapter.id, novel_id)
+    return chapter
+
+
 @router.patch("/novels/{novel_id}/chapters/{chap_id}", response_model=ChapterPublic)
 def update_chapter(
     novel_id: int,
@@ -128,9 +166,30 @@ def update_chapter(
 ):
     """Update a chapter."""
     chapter_db = _get_chapter_or_404(session, novel_id, chap_id)
-    chapter_db.sqlmodel_update(chapter.model_dump(exclude_unset=True))
+    updates = chapter.model_dump(exclude_unset=True)
+
+    if (
+        "number" in updates
+        and updates["number"] != chapter_db.number
+        and _duplicate_number_exists(
+            session, novel_id, updates["number"], exclude_id=chap_id
+        )
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Chapter {updates['number']} already exists in this novel",
+        )
+
+    chapter_db.sqlmodel_update(updates)
     session.add(chapter_db)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Chapter number already exists in this novel",
+        )
     session.refresh(chapter_db)
     return chapter_db
 

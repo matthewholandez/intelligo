@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -92,7 +92,7 @@ export function UploadChapterDialog({
         file: sourceMode === "file" ? file ?? undefined : undefined,
         source_text: sourceMode === "paste" ? sourceText : undefined,
       });
-      toast.success(`Chapter ${num} added`);
+      toast.success(`Chapter ${num} added — translating…`);
       onOpenChange(false);
       onSuccess?.(chapter.id, chapter.number);
     } catch (err) {
@@ -118,11 +118,15 @@ export function UploadChapterDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !isPending && onOpenChange(next)}>
-      <DialogContent className="shadow-overlay sm:max-w-lg" showCloseButton={!isPending}>
+      <DialogContent
+        className="shadow-overlay max-h-[85vh] overflow-y-auto sm:max-w-lg"
+        showCloseButton={!isPending}
+      >
         <DialogHeader>
           <DialogTitle>Upload chapter</DialogTitle>
           <DialogDescription>
-            Translation runs during upload and may take a while for long chapters.
+            Add an .html file or paste source text. Translation starts
+            automatically and runs in the background.
           </DialogDescription>
         </DialogHeader>
 
@@ -214,7 +218,7 @@ export function UploadChapterDialog({
               value={sourceText}
               disabled={isPending}
               onChange={(e) => setSourceText(e.target.value)}
-              className="min-h-[160px] font-mono text-sm"
+              className="max-h-[45vh] min-h-[160px] font-mono text-sm"
             />
           )}
 
@@ -222,13 +226,6 @@ export function UploadChapterDialog({
             <p className="text-sm text-destructive" role="alert">
               {error}
             </p>
-          ) : null}
-
-          {isPending ? (
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-muted px-4 py-3 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Translating chapter… this can take a while for long chapters.
-            </div>
           ) : null}
         </div>
 
