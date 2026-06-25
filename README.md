@@ -61,4 +61,7 @@ mprocs
 
 Then open **http://localhost:3000**. To run either side on its own, or to
 configure environment variables, see the per-directory READMEs linked above.
-</content>
+
+## Acknowledgements
+
+Claude Opus 4.8 (via Claude Code) assisted with this project, with particular assistance for the frontend. My thanks to Claude.
