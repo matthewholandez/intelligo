@@ -184,6 +184,26 @@
   font-style: italic;
 }
 
+/* Scene break: the markdown `* * *` becomes an <hr>. Render it as a
+   breathing, centered asterism rather than a cramped full-width hairline. */
+.reader-prose hr {
+  border: 0;
+  height: 0;
+  margin: 2.5em 0;
+  overflow: visible;
+  text-align: center;
+}
+
+.reader-prose hr::before {
+  content: "· · ·";
+  display: inline-block;
+  color: var(--muted-foreground);
+  font-size: 1.2em;
+  letter-spacing: 0.4em;
+  /* the letter-spacing adds trailing space; nudge back to stay centered */
+  text-indent: 0.4em;
+}
+
 .reader-prose code {
   font-family: var(--font-mono);
   font-size: 0.9em;

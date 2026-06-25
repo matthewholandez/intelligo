@@ -21,8 +21,30 @@ const IN_PROGRESS_LABEL: Record<string, string> = {
   translating: "Translating…",
 };
 
+// Async translation moves through discrete stages with no numeric percent,
+// so the bar reflects how far along the pipeline a chapter is.
+const STAGE_FRACTION: Record<string, number> = {
+  pending: 0.08,
+  analyzing: 0.45,
+  translating: 0.8,
+};
+
+function isInProgress(status: string) {
+  return status in IN_PROGRESS_LABEL;
+}
+
+/** First meaningful line of text, skipping scene breaks and blank lines. */
+function firstLine(text: string | null): string {
+  if (!text) return "";
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (line && !/^[*_\s.·]+$/.test(line)) return line;
+  }
+  return "";
+}
+
 function ChapterStatusIndicator({ chapter }: { chapter: Chapter }) {
-  if (chapter.status in IN_PROGRESS_LABEL) {
+  if (isInProgress(chapter.status)) {
     return (
       <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
         <Loader2 className="size-3.5 animate-spin" />
@@ -38,6 +60,25 @@ function ChapterStatusIndicator({ chapter }: { chapter: Chapter }) {
     );
   }
   return <span className="text-[13px] text-muted-foreground">Translated</span>;
+}
+
+function ChapterProgress({ status }: { status: string }) {
+  const fraction = STAGE_FRACTION[status] ?? 0;
+  return (
+    <div
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(fraction * 100)}
+      aria-label={IN_PROGRESS_LABEL[status]}
+      className="h-1 w-full overflow-hidden rounded-full bg-border/70"
+    >
+      <div
+        className="h-full rounded-full bg-accent transition-[width] duration-700 ease-out motion-safe:animate-pulse"
+        style={{ width: `${fraction * 100}%` }}
+      />
+    </div>
+  );
 }
 
 function ChapterRowSkeleton() {
@@ -67,9 +108,14 @@ export default function ChaptersTab({ novelId }: { novelId: number }) {
   const isEmpty = !isLoading && !isError && chapters?.length === 0;
 
   return (
-    <div>
+    <div className="space-y-4">
       {!isEmpty ? (
-        <div className="mb-4 flex justify-end">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[13px] text-muted-foreground">
+            {chapters
+              ? `${chapters.length} ${chapters.length === 1 ? "chapter" : "chapters"}`
+              : ""}
+          </span>
           <Button onClick={() => setUploadOpen(true)}>Upload chapter</Button>
         </div>
       ) : null}
@@ -90,21 +136,39 @@ export default function ChaptersTab({ novelId }: { novelId: number }) {
         />
       ) : (
         <div className="rounded-lg border border-border divide-y divide-border">
-          {chapters?.map((chapter) => (
+          {chapters?.map((chapter) => {
+            const inProgress = isInProgress(chapter.status);
+            const preview = inProgress
+              ? ""
+              : firstLine(
+                  chapter.status === "completed"
+                    ? chapter.translated_text
+                    : chapter.source_text
+                );
+            return (
             <div
               key={chapter.id}
               className="group flex items-center gap-3 px-4 py-3 transition-colors duration-150 hover:bg-surface-muted/60"
             >
               <Link
                 href={`/novels/${novelId}/chapters/${chapter.id}`}
-                className="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+                className="flex min-w-0 flex-1 flex-col gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
               >
-                <span className="font-medium">Ch. {chapter.number}</span>
-                <ChapterStatusIndicator chapter={chapter} />
-                <span className="ml-auto text-[13px] font-medium text-muted-foreground">
-                  {formatRelativeTime(chapter.updated_on)}
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">Ch. {chapter.number}</span>
+                  <ChapterStatusIndicator chapter={chapter} />
+                  <span className="ml-auto text-[13px] font-medium text-muted-foreground">
+                    {formatRelativeTime(chapter.updated_on)}
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100" />
+                </div>
+                {inProgress ? (
+                  <ChapterProgress status={chapter.status} />
+                ) : preview ? (
+                  <p className="truncate text-[13px] text-muted-foreground">
+                    {preview}
+                  </p>
+                ) : null}
               </Link>
               <Button
                 variant="ghost"
@@ -116,7 +180,8 @@ export default function ChaptersTab({ novelId }: { novelId: number }) {
                 <Trash2 className="size-3.5" />
               </Button>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
